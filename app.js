@@ -3,6 +3,7 @@ const cors = require("cors");
 const errorMiddleware = require("./middlewares/error");
 const dotenv = require("dotenv");
 const pageNotFound = require("./middlewares/pageNotFound");
+const cookieParser = require("cookie-parser");
 require("express-async-errors");
 
 const app = express();
@@ -17,6 +18,7 @@ app.use(
     credentials: true,
   })
 );
+app.use(cookieParser(process.env.COOKIE_SECRET));
 
 app.get("/", (req, res, next) => res.json({ anc: "abc" }));
 
@@ -30,12 +32,14 @@ const planRouter = require("./src/@plan_entity/plan.index");
 const certificateAddRouter = require("./src/@certificate_add_entity/certificateAdd.index");
 const moduleRouter = require("./src/@module_entity/module.index");
 const queryRouter = require("./src/@query_entity/query.index");
+const userRouter = require("./src/@user_entity/user.index");
 
 const {
   getHomeContent,
   uploadImage,
 } = require("./src/@user_entity/user.controller");
 const { upload } = require("./utils/s3");
+const { auth } = require("./middlewares/authentication");
 
 // Paths
 // Landing page static paths
@@ -49,6 +53,8 @@ app.use("/api/v1/content/certificate", certificateAddRouter);
 
 app.use("/api/v1/module", moduleRouter);
 app.use("/api/v1/query", queryRouter);
+
+app.use("/api/v1/user", userRouter);
 
 app.get("/api/v1/home", getHomeContent);
 app.post("/api/v1/upload-image", upload.single("file"), uploadImage);

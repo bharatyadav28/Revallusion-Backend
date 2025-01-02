@@ -15,8 +15,9 @@ const QuerySchema = new mongoose.Schema(
       trim: true,
     },
     mobile: {
-      type: Number,
+      type: String,
       required: [true, "Please enter your phone number"],
+      validator: validator.isMobilePhone,
     },
     profession: {
       type: String,
