@@ -53,7 +53,7 @@ class OTPManager {
       </div>
 
       <div style="color: #888888;">
-        <p style="margin-bottom: 10px;">Regards, <span style="color:rgb(123, 87, 202);">Team Revallusion</span></p>
+        <p style="margin-bottom: 40px;">Regards, <span style="color:#b19cd9;">Team Revallusion</span></p>
       </div>
     
     </div>`;
@@ -63,6 +63,8 @@ class OTPManager {
         subject:
           type === "account_verification"
             ? "Account Verification"
+            : type === "two_step_auth"
+            ? "Two Step Authentication"
             : "Password Reset",
         html: message,
       });

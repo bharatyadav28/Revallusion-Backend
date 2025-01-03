@@ -7,13 +7,20 @@ const PlanModel = require("../@plan_entity/plan.model");
 const MentorModel = require("../@mentor_entity/mentor.model");
 const CertficateAddModel = require("../@certificate_add_entity/certificateAdd.model");
 const FaqModel = require("../@faq_entity/faq.model");
-const { BadRequestError, NotFoundError } = require("../../errors/index.js");
+const {
+  BadRequestError,
+  NotFoundError,
+  ConflictError,
+} = require("../../errors/index.js");
 const { uploadImageToS3 } = require("../../utils/s3");
 const userModel = require("./user.model.js");
 const {
   createAccessToken,
   createRefreshToken,
   attachCookiesToResponse,
+  createTempToken,
+  attachTempTokenToCookies,
+  verify_token,
 } = require("../../utils/jwt.js");
 const {
   generateDeviceId,
@@ -93,22 +100,17 @@ exports.uploadImage = async (req, res) => {
 
 // Signin and Signup
 exports.signin = async (req, res) => {
-  const { email, mobile, password, switchDevice, keepMeSignedIn } = req.body;
+  const { email, password } = req.body;
 
   // Check required fields
-  if (!email && !mobile) {
-    throw new BadRequestError("Please enter email or phone number");
+  if (!email) {
+    throw new BadRequestError("Please enter email");
   }
   if (!password) {
     throw new BadRequestError("Please enter password");
   }
 
-  let query = { isDeleted: false };
-  if (email) {
-    query.email = email;
-  } else {
-    query.mobile = mobile;
-  }
+  let query = { email: email, isDeleted: false };
   let user = await userModel.findOne(query).select("+password");
 
   let isVerified = user && (user.isMobileVerified || user.isEmailVerified);
@@ -116,10 +118,9 @@ exports.signin = async (req, res) => {
   // Signup
   if (!user || !isVerified) {
     if (!user) {
-      user = await userModel.create({ email, mobile, password });
+      user = await userModel.create({ email, password });
     } else {
       user.email = email;
-      user.mobile = mobile;
       user.password = password;
       await user.save();
     }
@@ -128,7 +129,6 @@ exports.signin = async (req, res) => {
       userId: user._id,
       name: user.name || "User",
       email,
-      mobile,
       type: "account_verification",
     });
 
@@ -145,26 +145,56 @@ exports.signin = async (req, res) => {
     throw new BadRequestError("Invalid Password");
   }
 
+  await OTPManager.generateOTP({
+    userId: user._id,
+    name: user.name || "User",
+    email,
+    type: "two_step_auth",
+  });
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    userId: user._id,
+    message: "Otp sent to registered email or phone number",
+  });
+};
+
+exports.googleAuth = async (req, res) => {
+  // Fetch email
+  // If no email throw error
+  // check if email exists and email is verified, login()
+  // else signup(), user email verified = true
+  // token
+};
+
+// Helper function to check if user is already logged in on a different device
+const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
+  const otherDeviceSession = user.activeSessions.find(
+    (session) => session.deviceInfo.deviceId !== currentDeviceId
+  );
+
+  if (true) {
+    const payload = getTokenPayload(user);
+    const tempToken = createTempToken(payload);
+    attachTempTokenToCookies({ res, tempToken });
+
+    throw new ConflictError("You are already logged in on another device");
+  }
+};
+
+// Helper function to update session and create tokens
+const updateSessionAndCreateTokens = async ({
+  req,
+  res,
+  user,
+  deviceId,
+  ua,
+  keepMeSignedIn = false,
+}) => {
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
   const refreshToken = createRefreshToken(tokenPayoad, keepMeSignedIn);
-  attachCookiesToResponse({ res, accessToken, refreshToken });
 
-  const deviceId = generateDeviceId(req);
-  const ua = getDeviceData(req);
-
-  // Check if user is already logged in on a different device
-  const otherDeviceSession = user.activeSessions.find(
-    (session) => session.deviceInfo.deviceId !== deviceId
-  );
-  if (otherDeviceSession && !switchDevice) {
-    throw new BadRequestError("Already logged in on another device");
-  }
-
-  // User request to logout drom previous device
-  if (switchDevice) {
-    user.activeSessions = [];
-  }
   // Update or add session information
   const sessionInfo = {
     refreshToken,
@@ -187,53 +217,73 @@ exports.signin = async (req, res) => {
   } else {
     user.activeSessions.push(sessionInfo);
   }
-
   await user.save();
 
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    user: user,
-    message: "Signup successfull",
-  });
+  attachCookiesToResponse({ res, accessToken, refreshToken });
+  return;
 };
 
 exports.verifyUser = async (req, res) => {
-  const { otp, email, mobile, type, userId } = req.body;
+  const { otp, email, type, userId, keepMeSignedIn } = req.body;
 
-  if (!email && !mobile) {
-    throw new BadRequestError("Please enter email or phone number");
+  if (!email) {
+    throw new BadRequestError("Please provide email");
   }
 
-  const isEmailOtp = email ? true : false;
-
   const user = await getExistingUser(userId);
-  if (
-    (isEmailOtp && user.isEmailVerified) ||
-    (!isEmailOtp && user.isMobileVerified)
-  ) {
+  if (user.isEmailVerified && type === "account_verification") {
     throw new BadRequestError("User is already verified");
   }
 
-  let query = { otp, type, userId };
-  if (isEmailOtp) {
-    query.email = email;
-  } else {
-    query.mobile = mobile;
-  }
-
+  let query = { otp, type, userId, email };
   await OTPManager.verifyOTP(query);
+  if (type === "account_verification") user.isEmailVerified = true;
 
-  if (isEmailOtp) {
-    user.isEmailVerified = true;
-  } else {
-    user.isMobileVerified = true;
-  }
-  await user.save();
+  const deviceId = generateDeviceId(req);
+  const ua = getDeviceData(req);
+
+  // Check if user is already logged in on a different device
+  detectMultipleSessions({ res, user, currentDeviceId: deviceId });
+
+  await updateSessionAndCreateTokens({
+    req,
+    res,
+    user,
+    deviceId,
+    ua,
+    keepMeSignedIn,
+  });
 
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "OTP verified successfully",
     user,
+  });
+};
+
+exports.switchDevice = async (req, res) => {
+  const tempToken = req.signedCookies.tempToken;
+  const payload = verify_token({ token: tempToken, type: "temp" });
+
+  const existingUser = await getExistingUser(payload.user._id);
+
+  existingUser.activeSessions = [];
+  await existingUser.save();
+
+  const deviceId = generateDeviceId(req);
+  const ua = getDeviceData(req);
+  await updateSessionAndCreateTokens({
+    req,
+    res,
+    user: existingUser,
+    deviceId,
+    ua,
+  });
+
+  res.clearCookie("tempToken");
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Device switched successfully",
   });
 };
 
@@ -262,6 +312,7 @@ exports.logout = async (req, res) => {
   // clear token cookies
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
+  res.clearCookie("tempToken");
 
   res.status(StatusCodes.OK).json({
     success: true,

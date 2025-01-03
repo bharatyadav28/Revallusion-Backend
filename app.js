@@ -56,7 +56,7 @@ app.use("/api/v1/query", queryRouter);
 
 app.use("/api/v1/user", userRouter);
 
-app.get("/api/v1/home", getHomeContent);
+app.get("/api/v1/home", auth, getHomeContent);
 app.post("/api/v1/upload-image", upload.single("file"), uploadImage);
 
 // Notfound and error middlewares

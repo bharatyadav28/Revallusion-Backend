@@ -3,7 +3,7 @@ const multer = require("multer");
 
 const errorMiddleware = (error, req, res, next) => {
   // Logger.error(`Error occurred: ${error.message}\nStack trace: ${error.stack}`);
-  console.log("Error", error);
+  console.log("\nError", error);
 
   const customError = {
     message: error.message || "Internal Server Error",
