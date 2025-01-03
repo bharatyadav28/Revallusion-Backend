@@ -161,19 +161,85 @@ exports.signin = async (req, res) => {
 
 exports.googleAuth = async (req, res) => {
   // Fetch email
-  // If no email throw error
-  // check if email exists and email is verified, login()
-  // else signup(), user email verified = true
-  // token
+  const { googleToken } = req.body;
+
+  const response = await fetch(
+    "https://www.googleapis.com/oauth2/v3/userinfo",
+    {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${googleToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new BadRequestError(`Google login verification failed: ${error}`);
+  }
+
+  const data = await response.json();
+
+  // Extract user details
+  const { name, picture, email, email_verified } = data;
+  if (!email || !email_verified) {
+    throw new BadRequestError("Email is inaccessible or not verified");
+  }
+  let user = await userModel.findOne({ email, isDeleted: false });
+
+  // Signup
+  if (!user || !user.isEmailVerified) {
+    if (!user) {
+      user = await userModel.create({
+        email,
+        name,
+        avatar: picture,
+        isEmailVerified: true,
+      });
+    } else {
+      if (name) user.name = name;
+      if (picture) user.avatar = picture;
+      user.isEmailVerified = true;
+      await user.save();
+    }
+  }
+
+  // Signin
+  const deviceId = generateDeviceId(req);
+  const ua = getDeviceData(req);
+
+  // Check if user is already logged in on a different device
+  detectMultipleSessions({ res, user, currentDeviceId: deviceId });
+
+  await updateSessionAndCreateTokens({
+    req,
+    res,
+    user,
+    deviceId,
+    ua,
+  });
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Signin successfully",
+    user,
+  });
 };
 
 // Helper function to check if user is already logged in on a different device
 const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
+  if (user.activeSessions.length == 0) return;
+
   const otherDeviceSession = user.activeSessions.find(
     (session) => session.deviceInfo.deviceId !== currentDeviceId
   );
+  // const otherDeviceSession = user.activeSessions.find((session) => {
+  //   console.log("deviceid1 : ", session.deviceInfo.deviceId);
+  //   console.log("deviceid2 : ", currentDeviceId);
 
-  if (true) {
+  //   return session.deviceInfo.deviceId !== currentDeviceId;
+  // });
+
+  if (otherDeviceSession) {
     const payload = getTokenPayload(user);
     const tempToken = createTempToken(payload);
     attachTempTokenToCookies({ res, tempToken });
@@ -219,7 +285,7 @@ const updateSessionAndCreateTokens = async ({
   }
   await user.save();
 
-  attachCookiesToResponse({ res, accessToken, refreshToken });
+  attachCookiesToResponse({ res, accessToken, refreshToken, keepMeSignedIn });
   return;
 };
 

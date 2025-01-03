@@ -15,11 +15,12 @@ exports.generateDeviceId = (req) => {
   // Create a unique device identifier using multiple factors
   const deviceFactors = [
     ua.os.name,
-    ua.os.version,
-    ua.engine.name,
-    ua.cpu.architecture,
-    req.headers["accept-language"],
     req.ip, // IP address as part of device fingerprint
+
+    // ua.os.name,          // OS name (e.g., macOS, Windows, Android)
+    // ua.os.version,       // OS version (e.g., 10.15.7, 11.0)
+    // ua.device.type || "desktop", // Device type (e.g., desktop, mobile)
+    // ua.cpu.architecture || "x64", // CPU architecture (e.g., x64, arm64)
   ]
     .filter(Boolean)
     .join("|");

@@ -44,7 +44,12 @@ exports.verify_token = ({ token, type }) => {
 };
 
 // Add access and refresh token to cookies
-exports.attachCookiesToResponse = ({ res, accessToken, refreshToken }) => {
+exports.attachCookiesToResponse = ({
+  res,
+  accessToken,
+  refreshToken,
+  keepMeSignedIn,
+}) => {
   res.cookie("accessToken", accessToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -54,7 +59,7 @@ exports.attachCookiesToResponse = ({ res, accessToken, refreshToken }) => {
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    expires: new Date(Date.now() + maxTime),
+    expires: new Date(Date.now() + (keepMeSignedIn ? maxTime : minTime)),
     signed: true,
   });
 };
