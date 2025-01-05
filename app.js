@@ -4,6 +4,7 @@ const errorMiddleware = require("./middlewares/error");
 const dotenv = require("dotenv");
 const pageNotFound = require("./middlewares/pageNotFound");
 const cookieParser = require("cookie-parser");
+const path = require("path");
 require("express-async-errors");
 
 const app = express();
@@ -19,8 +20,11 @@ app.use(
   })
 );
 app.use(cookieParser(process.env.COOKIE_SECRET));
+app.use(express.static(path.join(__dirname, "public")));
 
-app.get("/", (req, res, next) => res.json({ anc: "abc" }));
+app.get("/", (req, res, next) =>
+  res.sendFile(path.join(__dirname, "public", "index.html"))
+);
 
 // Main apis
 const heroSectionRouter = require("./src/@hero_section_entity/heroSection.index");

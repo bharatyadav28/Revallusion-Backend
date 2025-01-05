@@ -275,7 +275,9 @@ const updateSessionAndCreateTokens = async ({
 
   // Find and update existing session for this device or add new one
   const existingSessionIndex = user.activeSessions.findIndex(
-    (session) => session.deviceInfo.deviceId === deviceId
+    (session) =>
+      session.deviceInfo.deviceId === deviceId &&
+      session.deviceInfo.userAgent === req.headers["user-agent"]
   );
 
   if (existingSessionIndex >= 0) {
