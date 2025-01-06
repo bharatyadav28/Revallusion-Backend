@@ -6,14 +6,15 @@ const {
   getMentorsData,
   deleteMentorsData,
 } = require("./mentor.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
 router
   .route("/")
-  .post(addMentor)
-  .put(addMentor)
+  .post(auth, isAdmin, addMentor)
+  .put(auth, isAdmin, addMentor)
   .get(getMentorsData)
-  .delete(deleteMentorsData);
+  .delete(auth, isAdmin, deleteMentorsData);
 
 module.exports = router;

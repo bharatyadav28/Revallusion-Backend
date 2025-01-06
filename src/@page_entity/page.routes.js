@@ -8,10 +8,15 @@ const {
   getPage,
   updatePage,
 } = require("./page.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
-router.route("/").post(addPage).get(getPages);
-router.route("/:id").delete(deletePage).put(updatePage).get(getPage);
+router.route("/").post(auth, isAdmin, addPage).get(getPages);
+router
+  .route("/:id")
+  .delete(auth, isAdmin, deletePage)
+  .put(auth, isAdmin, updatePage)
+  .get(getPage);
 
 module.exports = router;

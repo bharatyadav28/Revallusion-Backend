@@ -6,14 +6,15 @@ const {
   getHeroSection,
   deleteHeroSection,
 } = require("./heroSection.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
 router
   .route("/")
-  .post(addHeroSection)
-  .put(addHeroSection)
+  .post(auth, isAdmin, addHeroSection)
+  .put(auth, isAdmin, addHeroSection)
   .get(getHeroSection)
-  .delete(deleteHeroSection);
+  .delete(auth, isAdmin, deleteHeroSection);
 
 module.exports = router;

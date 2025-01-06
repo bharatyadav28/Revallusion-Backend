@@ -144,6 +144,22 @@ exports.signin = async (req, res) => {
   if (!isMatchPassword) {
     throw new BadRequestError("Invalid Password");
   }
+  console.log("Role: ", user.role);
+
+  if (user.role === "admin") {
+    await updateSessionAndCreateTokens({
+      req,
+      res,
+      user,
+      deviceId: generateDeviceId(req),
+      ua: getDeviceData(req),
+      keepMeSignedIn: true,
+    });
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Admin logged in successfully",
+    });
+  }
 
   await OTPManager.generateOTP({
     userId: user._id,

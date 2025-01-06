@@ -8,9 +8,14 @@ const {
   updatePlan,
   deletePlan,
 } = require("./plan.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
-router.route("/").post(addPlan).get(getPlans);
-router.route("/:id").delete(deletePlan).put(updatePlan).get(getPlan);
+router.route("/").post(auth, isAdmin, addPlan).get(getPlans);
+router
+  .route("/:id")
+  .delete(auth, isAdmin, deletePlan)
+  .put(auth, isAdmin, updatePlan)
+  .get(getPlan);
 module.exports = router;

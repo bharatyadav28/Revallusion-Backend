@@ -8,10 +8,15 @@ const {
   updateModule,
   deleteModule,
 } = require("./module.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
-router.route("/").post(createModule).get(getModules);
-router.route("/:id").get(getModule).put(updateModule).delete(deleteModule);
+router.route("/").post(auth, isAdmin, createModule).get(getModules);
+router
+  .route("/:id")
+  .get(getModule)
+  .put(auth, isAdmin, updateModule)
+  .delete(auth, isAdmin, deleteModule);
 
 module.exports = router;

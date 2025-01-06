@@ -1,7 +1,6 @@
 const express = require("express");
 
 const { auth } = require("../../middlewares/authentication");
-
 const {
   signin,
   logout,
@@ -17,6 +16,7 @@ router.route("/verify-user").post(verifyUser);
 router.route("/switch-device").post(switchDevice);
 
 router.route("/google-auth").post(googleAuth);
+
 router.route("/logout").delete(auth, logout);
 
 module.exports = router;

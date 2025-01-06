@@ -8,14 +8,15 @@ const {
   deleteCarousal,
   updateCarousal,
 } = require("./carousal.controller");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
-router.route("/").post(addCarousalData).get(getCarousals);
+router.route("/").post(auth, isAdmin, addCarousalData).get(getCarousals);
 router
   .route("/:id")
-  .delete(deleteCarousal)
-  .put(updateCarousal)
+  .delete(auth, isAdmin, deleteCarousal)
+  .put(auth, isAdmin, updateCarousal)
   .get(getCarousal);
 
 module.exports = router;

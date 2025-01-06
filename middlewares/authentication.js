@@ -1,4 +1,5 @@
-const { UnauthenticatedError, NotFoundError } = require("../errors");
+const { UnauthenticatedError, UnAuthorizedError } = require("../errors");
+const userModel = require("../src/@user_entity/user.model");
 const {
   generateDeviceId,
   getExistingUser,
@@ -115,4 +116,14 @@ exports.auth = async (req, res, next) => {
       );
     }
   }
+};
+
+exports.isAdmin = async (req, res, next) => {
+  // const user = await userModel.findById(req.user._id);
+
+  // if (!user || user.role !== "admin") {
+  //   throw new UnAuthorizedError("Not authorized to access this route");
+  // }
+
+  return next();
 };
