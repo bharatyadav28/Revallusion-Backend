@@ -29,6 +29,7 @@ const {
   filterUserData,
 } = require("../../utils/helperFuns.js");
 const OTPManager = require("../../utils/OTPManager.js");
+const { appendBucketName } = require("../../utils/helperFuns.js");
 
 //  User's home page content
 exports.getHomeContent = async (req, res, next) => {
@@ -37,7 +38,7 @@ exports.getHomeContent = async (req, res, next) => {
   const modules = ModuleModel.find();
   const plans = PlanModel.find();
   const mentors = MentorModel.find();
-  const certificates = CertficateAddModel.find();
+  const certificate = CertficateAddModel.findOne().lean();
   const faqs = FaqModel.find();
   const mentor = await MentorModel.findOne();
 
@@ -47,10 +48,15 @@ exports.getHomeContent = async (req, res, next) => {
     modules,
     plans,
     mentors,
-    certificates,
+    certificate,
     faqs,
     mentor,
   ]);
+
+  const getCertificate = (certificate) => {
+    if (!certificate.image) return certificate;
+    return { ...data[5], image: appendBucketName(data[5]?.image) };
+  };
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -60,7 +66,7 @@ exports.getHomeContent = async (req, res, next) => {
       modules: data[2],
       plans: data[3],
       mentors: data[4],
-      certificates: data[5],
+      certificate: getCertificate(data[5]),
       faqs: data[6],
       mentor: data[7],
     },

@@ -18,9 +18,9 @@ exports.createCertificateAdd = async (req, res) => {
     if (caption) certificate.caption = caption;
     if (key_points) certificate.key_points = key_points;
     await certificate.save();
+  } else {
+    await CertficateAddModel.create({ image, caption, key_points });
   }
-
-  await CertficateAddModel.create({ image, caption, key_points });
 
   const statusCode = certificate ? StatusCodes.OK : StatusCodes.CREATED;
   const message = certificate
