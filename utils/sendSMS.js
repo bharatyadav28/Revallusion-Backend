@@ -13,8 +13,6 @@ const sendSMS = async ({ to, body }) => {
     to,
     body,
   });
-
-  console.log("OTP sent successfully:", message.sid);
 };
 
 module.exports = sendSMS;

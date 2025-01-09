@@ -15,9 +15,6 @@ const PageSchema = new mongoose.Schema(
       default: "Active",
       enum: ["Active", "Inactive"],
     },
-    type: {
-      type: String,
-    },
   },
   {
     timestamps: true,

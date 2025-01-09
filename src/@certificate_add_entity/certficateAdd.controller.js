@@ -2,6 +2,10 @@ const { StatusCodes } = require("http-status-codes");
 
 const CertficateAddModel = require("./certificateAdd.model.js");
 const { NotFoundError } = require("../../errors/index.js");
+const {
+  extractURLKey,
+  appendBucketName,
+} = require("../../utils/helperFuns.js");
 
 // Add or update certificate
 exports.createCertificateAdd = async (req, res) => {
@@ -10,7 +14,7 @@ exports.createCertificateAdd = async (req, res) => {
   const certificate = await CertficateAddModel.findOne();
 
   if (certificate) {
-    if (image) certificate.image = image;
+    if (image) certificate.image = extractURLKey(image);
     if (caption) certificate.caption = caption;
     if (key_points) certificate.key_points = key_points;
     await certificate.save();
@@ -29,8 +33,11 @@ exports.createCertificateAdd = async (req, res) => {
   });
 };
 
+// Get certificate
 exports.getCertificateAdd = async (req, res) => {
   const certificate = await CertficateAddModel.findOne().lean();
+
+  certificate.image = appendBucketName(certificate.image);
   res.status(StatusCodes.OK).json({
     success: true,
     data: { certificate },

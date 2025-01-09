@@ -37,13 +37,7 @@ const certificateAddRouter = require("./src/@certificate_add_entity/certificateA
 const moduleRouter = require("./src/@module_entity/module.index");
 const queryRouter = require("./src/@query_entity/query.index");
 const userRouter = require("./src/@user_entity/user.index");
-
-const {
-  getHomeContent,
-  uploadImage,
-} = require("./src/@user_entity/user.controller");
-const { upload } = require("./utils/s3");
-const { auth } = require("./middlewares/authentication");
+const adminRouter = require("./src/@admin_entity/admin.index");
 
 // Paths
 // Landing page static paths
@@ -59,9 +53,7 @@ app.use("/api/v1/module", moduleRouter);
 app.use("/api/v1/query", queryRouter);
 
 app.use("/api/v1/user", userRouter);
-
-app.get("/api/v1/home", getHomeContent);
-app.post("/api/v1/upload-image", upload.single("file"), uploadImage);
+app.use("/api/v1/admin", adminRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

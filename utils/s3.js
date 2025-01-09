@@ -37,7 +37,7 @@ exports.uploadImageToS3 = async (file, user) => {
     client: s3Client,
     params: {
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/images/user-${user}/${fileName}.webp`,
+      Key: `uploads/${user}/images/${fileName}.webp`,
       Body: webpImageBuffer, // Buffer or stream
       ContentType: "image/webp",
       ServerSideEncryption: "AES256",
@@ -70,7 +70,7 @@ exports.uploadDocumentToS3 = async (file, user) => {
     client: s3Client,
     params: {
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/documents/user-${user}/${fileName}${extension}`,
+      Key: `uploads/${user}/documents/${fileName}${extension}`,
       Body: file.buffer, // Buffer of the document
       ContentType: file.mimetype, // MIME type of the document
       ServerSideEncryption: "AES256", // Encryption for security

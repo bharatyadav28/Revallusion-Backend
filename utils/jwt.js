@@ -55,12 +55,14 @@ exports.attachCookiesToResponse = ({
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + minTime),
     signed: true,
+    // sameSite: "None",
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + (keepMeSignedIn ? maxTime : minTime)),
     signed: true,
+    // sameSite: "None",
   });
 };
 
@@ -71,6 +73,7 @@ exports.attachAccessTokenToCookies = ({ res, accessToken }) => {
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + minTime),
     signed: true,
+    // sameSite: "None",
   });
 };
 

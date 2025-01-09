@@ -3,12 +3,14 @@ const UAParser = require("ua-parser-js");
 const userModel = require("../src/@user_entity/user.model");
 const { NotFoundError } = require("../errors/index");
 
+// Get device info
 exports.getDeviceData = (req) => {
   const parser = new UAParser(req.headers["user-agent"]);
   const ua = parser.getResult();
   return ua;
 };
 
+// Generate unqiue device identifier
 exports.generateDeviceId = (req) => {
   const ua = exports.getDeviceData(req);
 
@@ -31,10 +33,12 @@ exports.generateDeviceId = (req) => {
     .digest("hex");
 };
 
+// Token meta data
 exports.getTokenPayload = (user) => {
   return { user: { _id: user._id } };
 };
 
+// Get user details by id
 exports.getExistingUser = async (userId) => {
   const existingUser = await userModel.findOne({
     _id: userId,
@@ -44,4 +48,27 @@ exports.getExistingUser = async (userId) => {
     throw new NotFoundError("User not found");
   }
   return existingUser;
+};
+
+// Filter user data for fronend
+exports.filterUserData = (user) => {
+  return {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    mobile: user.mobile,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,
+    isMobileVerified: user.isMobileVerified,
+  };
+};
+
+// Extract path form AWS bucket url
+exports.extractURLKey = (url) => {
+  return url.replace(/^https?:\/\/[^/]+\/(.+)$/, "$1");
+};
+
+// Append AWS bucket name before the file path
+exports.appendBucketName = (url) => {
+  return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${url}`;
 };

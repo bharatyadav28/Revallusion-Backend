@@ -119,11 +119,11 @@ exports.auth = async (req, res, next) => {
 };
 
 exports.isAdmin = async (req, res, next) => {
-  // const user = await userModel.findById(req.user._id);
+  const user = await userModel.findById(req.user._id);
 
-  // if (!user || user.role !== "admin") {
-  //   throw new UnAuthorizedError("Not authorized to access this route");
-  // }
+  if (!user || user.role !== "admin") {
+    throw new UnAuthorizedError("Not authorized to access this route");
+  }
 
   return next();
 };

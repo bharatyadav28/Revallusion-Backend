@@ -12,7 +12,6 @@ const {
   NotFoundError,
   ConflictError,
 } = require("../../errors/index.js");
-const { uploadImageToS3 } = require("../../utils/s3");
 const userModel = require("./user.model.js");
 const {
   createAccessToken,
@@ -27,6 +26,7 @@ const {
   getDeviceData,
   getExistingUser,
   getTokenPayload,
+  filterUserData,
 } = require("../../utils/helperFuns.js");
 const OTPManager = require("../../utils/OTPManager.js");
 
@@ -68,33 +68,18 @@ exports.getHomeContent = async (req, res, next) => {
   });
 };
 
-// Upload image
-exports.uploadImage = async (req, res) => {
-  if (!req.file) {
-    throw new BadRequestError("Please upload an image");
-  }
+// send auth user details
+exports.sendMe = async (req, res) => {
+  const userId = req.user._id;
 
-  const user = req.userID || "admin";
+  const user = await userModel.findOne({ _id: userId, isDeleted: false });
 
-  // Get file type
-  const fileType = req.file.mimetype.split("/")[0];
+  const userData = filterUserData(user);
 
-  let uploadResult;
-  if (fileType === "image") {
-    uploadResult = await uploadImageToS3(req.file, user);
-  } else {
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ error: "Unsupported file type" });
-  }
-
-  // Generate image URL
-  const result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;
-
-  return res.status(StatusCodes.OK).json({
+  res.status(StatusCodes.OK).json({
     success: true,
-    data: { imageUrl: result },
-    message: "Image uploaded successfully",
+    data: { user: userData },
+    message: "User details fetched successfully",
   });
 };
 
@@ -135,7 +120,11 @@ exports.signin = async (req, res) => {
     return res.status(StatusCodes.CREATED).json({
       success: true,
       message: "Otp sent to registered email or phone number",
-      userId: user._id,
+      data: {
+        user: {
+          _id: user._id,
+        },
+      },
     });
   }
 
@@ -143,22 +132,6 @@ exports.signin = async (req, res) => {
   const isMatchPassword = await user.comparePassword(password);
   if (!isMatchPassword) {
     throw new BadRequestError("Invalid Password");
-  }
-  console.log("Role: ", user.role);
-
-  if (user.role === "admin") {
-    await updateSessionAndCreateTokens({
-      req,
-      res,
-      user,
-      deviceId: generateDeviceId(req),
-      ua: getDeviceData(req),
-      keepMeSignedIn: true,
-    });
-    return res.status(StatusCodes.OK).json({
-      success: true,
-      message: "Admin logged in successfully",
-    });
   }
 
   await OTPManager.generateOTP({
@@ -170,7 +143,11 @@ exports.signin = async (req, res) => {
 
   return res.status(StatusCodes.OK).json({
     success: true,
-    userId: user._id,
+    data: {
+      user: {
+        _id: user._id,
+      },
+    },
     message: "Otp sent to registered email or phone number",
   });
 };
@@ -234,10 +211,12 @@ exports.googleAuth = async (req, res) => {
     ua,
   });
 
+  const userData = filterUserData(user);
+
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Signin successfully",
-    user,
+    data: { user: userData },
   });
 };
 
@@ -265,7 +244,7 @@ const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
 };
 
 // Helper function to update session and create tokens
-const updateSessionAndCreateTokens = async ({
+exports.updateSessionAndCreateTokens = async ({
   req,
   res,
   user,
@@ -307,6 +286,7 @@ const updateSessionAndCreateTokens = async ({
   return;
 };
 
+// User verification
 exports.verifyUser = async (req, res) => {
   const { otp, email, type, userId, keepMeSignedIn } = req.body;
 
@@ -338,13 +318,15 @@ exports.verifyUser = async (req, res) => {
     keepMeSignedIn,
   });
 
+  const userData = filterUserData(user);
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "OTP verified successfully",
-    user,
+    data: { user: userData },
   });
 };
 
+// Switch device
 exports.switchDevice = async (req, res) => {
   const tempToken = req.signedCookies.tempToken;
   const payload = verify_token({ token: tempToken, type: "temp" });
