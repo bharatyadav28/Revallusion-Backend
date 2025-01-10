@@ -2,14 +2,14 @@ const { StatusCodes } = require("http-status-codes");
 
 const QueryModel = require("./query.model.js");
 const { NotFoundError, BadRequestError } = require("../../errors/index.js");
-const { uploadImageToS3, uploadDocumentToS3 } = require("../../utils/s3");
+
 const { appendBucketName } = require("../../utils/helperFuns.js");
+const { s3Uploadv4Query } = require("../../utils/s3.js");
 
 // Create new query
 exports.createQuery = async (req, res) => {
   const { name, email, mobile, profile, address, message, profession } =
     req.body;
-  let result = "";
 
   if (!email) {
     throw new BadRequestError("Please enter your email");
@@ -19,26 +19,17 @@ exports.createQuery = async (req, res) => {
     throw new BadRequestError("Please enter a valid mobile number");
   }
 
+  let result = "";
+
   // Upload image or document file only
   if (req.file) {
-    // Get file type
-    const fileType = req.file.mimetype.split("/")[0];
-
-    const userString = `query/${email}`;
-    let uploadResult;
-    if (fileType === "image") {
-      uploadResult = await uploadImageToS3(req.file, userString);
-    } else if (fileType === "application") {
-      uploadResult = await uploadDocumentToS3(req.file, userString);
-    } else {
-      return res
-        .status(StatusCodes.BAD_REQUEST)
-        .json({ error: "Unsupported file type" });
+    // Validate file size
+    if (req.file.size > 10 * 1024 * 1024) {
+      throw new BadRequestError("File size should be less than 10MB");
     }
 
-    // Generate image URL
-    // result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;
-    result = uploadResult.Key;
+    // Get file type
+    result = await s3Uploadv4Query(req.file);
   }
 
   await QueryModel.create({
@@ -49,7 +40,7 @@ exports.createQuery = async (req, res) => {
     address,
     message,
     profession,
-    file: result,
+    file: result?.Key,
   });
 
   res.status(StatusCodes.CREATED).json({

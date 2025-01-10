@@ -1,107 +1,267 @@
-const { S3Client } = require("@aws-sdk/client-s3");
-const { Upload } = require("@aws-sdk/lib-storage");
-const sharp = require("sharp");
+const aws = require("aws-sdk");
+const SDK = require("aws-sdk");
+require("aws-sdk/lib/maintenance_mode_message").suppress = true;
 const crypto = require("crypto");
-const path = require("path");
-const sanitize = require("sanitize-filename");
 const { promisify } = require("util");
+const dotenv = require("dotenv");
 const multer = require("multer");
+const S3 = require("aws-sdk/clients/s3");
+const sharp = require("sharp");
 
 const randomBytes = promisify(crypto.randomBytes);
 
-const s3Client = new S3Client({
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
+const s3 = new aws.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
   region: process.env.AWS_BUCKET_REGION,
+  signatureVersion: "v4",
 });
 
-// Upload image
-exports.uploadImageToS3 = async (file, user) => {
-  // Generate random file name
-  const rawBytes = await randomBytes(16);
-  const fileName = rawBytes.toString("hex");
+exports.s3UploadVideo = async (file, id, access) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
 
-  // File size limit (10MB)
-  const maxImageSize = 10 * 1024 * 1024;
-  if (file.size > maxImageSize) {
-    throw new Error("Image file size exceeds the limit of 5MB");
+  const rawBytes = await randomBytes(16);
+  const imageName = rawBytes.toString("hex");
+  let key = `admin-uploads/${imageName}`;
+
+  if (access) {
+    key = `free-videos/${imageName}`;
   }
 
-  // Optimize image to .webp
-  const webpImageBuffer = await sharp(file.buffer).webp({ quality: 80 });
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: file.buffer,
+  };
 
-  // Upload image
-  const upload = new Upload({
-    client: s3Client,
-    params: {
+  const data = await s3.upload(params).promise();
+  data.Location = imageName;
+  return data;
+};
+
+exports.generateUploadURL = async (access, video_type) => {
+  const rawBytes = await randomBytes(16);
+  const imageName = rawBytes.toString("hex");
+  let key = `admin-uploads/${imageName}`;
+  if (access) {
+    key = `free-videos/${imageName}-${video_type}`;
+  }
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Expires: 2400,
+  };
+
+  const uploadURL = await s3.getSignedUrlPromise("putObject", params);
+  return { uploadURL, imageName };
+};
+
+exports.s3Uploadv4 = async (file, id) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+
+  if (file?.mimetype?.split("/")[0] === "image") {
+    const key = `uploads/user-${id}/profile/${Date.now().toString()}-${file.originalname.replaceAll(
+      " ",
+      ""
+    )}.webp`;
+    const webpImageBuffer = await sharp(file.buffer).webp({ quality: 80 });
+
+    const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/${user}/images/${fileName}.webp`,
-      Body: webpImageBuffer, // Buffer or stream
+      Key: key,
+      Body: webpImageBuffer,
       ContentType: "image/webp",
-      ServerSideEncryption: "AES256",
-    },
-  });
+    };
+    // const key = `uploads/user-${id}/profile/${Date.now().toString()}-${file.originalname.replaceAll(
+    //   " ",
+    //   ""
+    // )}`;
 
-  // Perform the upload and return the url key
-  return await upload.done();
+    // const params = {
+    //   Bucket: process.env.AWS_BUCKET_NAME,
+    //   Key: key,
+    //   Body: file.buffer,
+    // };
+
+    const data = await s3.upload(params).promise();
+    data.Location = data.Key;
+    return data;
+  } else {
+    const key = `uploads/user-${id}/pdf/${Date.now().toString()}-invoice.pdf`;
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: file,
+    };
+
+    const data = await s3.upload(params).promise();
+    data.Location = data.Key;
+    return data;
+  }
 };
 
-// Upload document
-exports.uploadDocumentToS3 = async (file, user) => {
-  // Generate random file name
-  const rawBytes = await randomBytes(16);
-  const fileName = rawBytes.toString("hex");
+exports.s3Uploadv4Query = async (file) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
 
-  // Sanitize file name
-  const sanitizedFileName = sanitize(file.originalname);
+  // Generate a unique key for the file
+  const key = `uploads/user/query/${Date.now().toString()}-${file.originalname.replaceAll(
+    " ",
+    ""
+  )}`;
 
-  // File size limit (5MB)
-  const maxDocSize = 5 * 1024 * 1024;
-  if (file.size > maxDocSize) {
-    throw new Error("Document file size exceeds the limit of 2MB");
+  let fileBuffer = file.buffer;
+  let contentType = file.mimetype;
+
+  // Optionally process images for optimization
+  if (file.mimetype.startsWith("image/")) {
+    fileBuffer = await sharp(file.buffer).toBuffer();
+    contentType = file.mimetype; // Maintain original content type
   }
 
-  const extension = path.extname(sanitizedFileName) || ".pdf";
+  // S3 upload parameters
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: fileBuffer,
+    ContentType: contentType, // Dynamically assign the file's MIME type
+  };
 
-  // Create the Upload instance for document
-  const upload = new Upload({
-    client: s3Client,
-    params: {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: `uploads/${user}/documents/${fileName}${extension}`,
-      Body: file.buffer, // Buffer of the document
-      ContentType: file.mimetype, // MIME type of the document
-      ServerSideEncryption: "AES256", // Encryption for security
-    },
-  });
-
-  // Perform the upload and return the url key
-  return await upload.done();
+  // Upload to S3
+  const data = await s3.upload(params).promise();
+  data.Location = data.Key;
+  return data;
 };
 
-// Allowed file types
-const allowedMimeTypes = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "application/pdf",
-  "video/mp4",
-  "video/mkv",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "text/plain", // .txt
-];
+exports.s3AdminUploadv4 = async (file) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+  const key = `uploads/users-${Date.now().toString()}-${file.originalname.replaceAll(
+    " ",
+    ""
+  )}`;
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: file.buffer,
+  };
 
-// Memory storage
+  const data = await s3.upload(params).promise();
+  data.Location = data.Key;
+  return data;
+};
+
+exports.s3UploadMulti = async (files) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+
+  const params = files.map((file) => {
+    return {
+      Bucket: process.env.AWS_BUCKET_NAME_EMAIL,
+      Key: `emails/${Date.now().toString()}-${
+        file.originalname ? file.originalname : "not"
+      }`,
+      Body: file.buffer,
+    };
+  });
+
+  return await Promise.all(params.map((param) => s3.upload(param).promise()));
+};
+
+exports.s3delete = async (file) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+
+  const key1 = file.split("/")[5];
+  const param = {
+    Bucket: process.env.AWS_CAR_BUCKET_REGION,
+    Key: `admin-uploads/images/${key1}`,
+  };
+
+  return await s3.deleteObject(param).promise();
+};
+
+exports.s3UploadMulti = async (files) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+
+  const params = files.map((file) => {
+    return {
+      Bucket: process.env.AWS_BUCKET_NAME_EMAIL,
+      Key: `emails/${Date.now().toString()}-${
+        file.originalname ? file.originalname : "not"
+      }`,
+      Body: file.buffer,
+    };
+  });
+
+  return await Promise.all(params.map((param) => s3.upload(param).promise()));
+};
+
+exports.s3delete = async (file) => {
+  const s3 = new aws.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_BUCKET_REGION,
+  });
+
+  const key1 = file.split("/")[5];
+  const param = {
+    Bucket: process.env.AWS_CAR_BUCKET_REGION,
+    Key: `admin-uploads/images/${key1}`,
+  };
+
+  return await s3.deleteObject(param).promise();
+};
+
 const storage = multer.memoryStorage();
 
-// File filter function
-const fileFilter = (req, file, cb) => {
-  if (allowedMimeTypes.includes(file.mimetype)) {
-    cb(null, true); // Accept the file
+const blockedMimeTypes = [
+  "application/x-msdownload", // .exe
+  "application/x-dosexec", // .exe
+  "application/x-sh", // .sh
+  "application/x-bat", // .bat
+  "application/x-php", // .php
+  "application/javascript", // .js
+  "application/x-csh", // .csh
+  "text/x-python", // .py
+  "text/x-shellscript", // Shell scripts
+];
+
+const fileFilter = async (req, file, cb) => {
+  if (
+    (file.mimetype.split("/")[0] === "image" ||
+      file.mimetype.split("/")[0] === "application" ||
+      file.mimetype.split("/")[0] === "video") &&
+    !blockedMimeTypes.includes(file.mimetype)
+  ) {
+    cb(null, true);
   } else {
-    cb(new Error("Unsupported file type"), false); // Reject the file
+    cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE"), false);
   }
 };
 

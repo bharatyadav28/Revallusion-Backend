@@ -9,8 +9,7 @@ const {
   getDeviceData,
   filterUserData,
 } = require("../../utils/helperFuns");
-const { uploadImageToS3 } = require("../../utils/s3");
-const { getExistingUser } = require("../../utils/helperFuns");
+const { s3AdminUploadv4 } = require("../../utils/s3");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -87,22 +86,12 @@ exports.uploadImage = async (req, res) => {
     throw new BadRequestError("Please upload an image");
   }
 
-  const { type } = req.body;
-
-  const user = await getExistingUser(req.user._id);
-  if (!user) {
-    throw new NotFoundError("User not found");
-  }
-
-  let userString = `${user.role}/${user._id}`;
-  if (type) userString += `/${type}`;
-
   // Get file type
   const fileType = req.file.mimetype.split("/")[0];
 
   let uploadResult;
   if (fileType === "image") {
-    uploadResult = await uploadImageToS3(req.file, userString);
+    uploadResult = await s3AdminUploadv4(req.file);
   } else {
     return res
       .status(StatusCodes.BAD_REQUEST)
