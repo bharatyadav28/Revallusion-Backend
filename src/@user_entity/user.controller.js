@@ -209,7 +209,7 @@ exports.googleAuth = async (req, res) => {
   // Check if user is already logged in on a different device
   detectMultipleSessions({ res, user, currentDeviceId: deviceId });
 
-  await updateSessionAndCreateTokens({
+  await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
@@ -315,7 +315,7 @@ exports.verifyUser = async (req, res) => {
   // Check if user is already logged in on a different device
   detectMultipleSessions({ res, user, currentDeviceId: deviceId });
 
-  await updateSessionAndCreateTokens({
+  await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
@@ -344,7 +344,7 @@ exports.switchDevice = async (req, res) => {
 
   const deviceId = generateDeviceId(req);
   const ua = getDeviceData(req);
-  await updateSessionAndCreateTokens({
+  await exports.updateSessionAndCreateTokens({
     req,
     res,
     user: existingUser,
