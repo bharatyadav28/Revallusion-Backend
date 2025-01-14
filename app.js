@@ -14,7 +14,7 @@ dotenv.config({ path: "./config/config.env" });
 app.use(express.json());
 app.use(
   cors({
-    origin: "*",
+    origin: ["*"],
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
   })
@@ -38,6 +38,8 @@ const moduleRouter = require("./src/@module_entity/module.index");
 const queryRouter = require("./src/@query_entity/query.index");
 const userRouter = require("./src/@user_entity/user.index");
 const adminRouter = require("./src/@admin_entity/admin.index");
+const videoRouter = require("./src/@video_entity/video.index");
+const courseRouter = require("./src/@course_entity/course.index");
 
 // Paths
 // Landing page static paths
@@ -54,6 +56,8 @@ app.use("/api/v1/query", queryRouter);
 
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/admin", adminRouter);
+app.use("/api/v1/video", videoRouter);
+app.use("/api/v1/course", courseRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

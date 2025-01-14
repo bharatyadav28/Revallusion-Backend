@@ -43,22 +43,20 @@ exports.s3UploadVideo = async (file, id, access) => {
   return data;
 };
 
-exports.generateUploadURL = async (access, video_type) => {
+exports.generateUploadURL = async (fileExtension = "mp4") => {
   const rawBytes = await randomBytes(16);
-  const imageName = rawBytes.toString("hex");
-  let key = `admin-uploads/${imageName}`;
-  if (access) {
-    key = `free-videos/${imageName}-${video_type}`;
-  }
+  const videoName = rawBytes.toString("hex");
+  let key = `admin-uploads/${videoName}.${fileExtension}`;
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: key,
     Expires: 2400,
+    ContentType: `video/${fileExtension}`,
   };
 
   const uploadURL = await s3.getSignedUrlPromise("putObject", params);
-  return { uploadURL, imageName };
+  return { uploadURL, videoName };
 };
 
 exports.s3Uploadv4 = async (file, id) => {
@@ -186,17 +184,16 @@ exports.s3UploadMulti = async (files) => {
   return await Promise.all(params.map((param) => s3.upload(param).promise()));
 };
 
-exports.s3delete = async (file) => {
+exports.s3delete = async (Key) => {
   const s3 = new aws.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_BUCKET_REGION,
   });
 
-  const key1 = file.split("/")[5];
   const param = {
-    Bucket: process.env.AWS_CAR_BUCKET_REGION,
-    Key: `admin-uploads/images/${key1}`,
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key,
   };
 
   return await s3.deleteObject(param).promise();
@@ -220,22 +217,6 @@ exports.s3UploadMulti = async (files) => {
   });
 
   return await Promise.all(params.map((param) => s3.upload(param).promise()));
-};
-
-exports.s3delete = async (file) => {
-  const s3 = new aws.S3({
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-    region: process.env.AWS_BUCKET_REGION,
-  });
-
-  const key1 = file.split("/")[5];
-  const param = {
-    Bucket: process.env.AWS_CAR_BUCKET_REGION,
-    Key: `admin-uploads/images/${key1}`,
-  };
-
-  return await s3.deleteObject(param).promise();
 };
 
 const storage = multer.memoryStorage();

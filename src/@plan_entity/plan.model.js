@@ -16,6 +16,13 @@ const PlanSchema = new mongoose.Schema(
       type: Number,
       required: [true, "Please provide plan validity"],
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );

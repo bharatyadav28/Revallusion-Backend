@@ -2,6 +2,7 @@ const UAParser = require("ua-parser-js");
 
 const userModel = require("../src/@user_entity/user.model");
 const { NotFoundError } = require("../errors/index");
+const mongoose = require("mongoose");
 
 // Get device info
 exports.getDeviceData = (req) => {
@@ -65,10 +66,16 @@ exports.filterUserData = (user) => {
 
 // Extract path form AWS bucket url
 exports.extractURLKey = (url) => {
-  return url.replace(/^https?:\/\/[^/]+\/(.+)$/, "$1");
+  return url.replace(/^https?:\/\/[^/]+\/([^?]+)(\?.*)?$/, "$1");
 };
+
+exports.awsUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com`;
 
 // Append AWS bucket name before the file path
 exports.appendBucketName = (url) => {
-  return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${url}`;
+  return `${exports.awsUrl}/${url}`;
+};
+
+exports.StringToObjectId = (str) => {
+  return new mongoose.Types.ObjectId(str);
 };

@@ -1,12 +1,27 @@
 const { StatusCodes } = require("http-status-codes");
 
 const PlanModel = require("./plan.model.js");
+const courseModel = require("../@course_entity/course.model.js");
 const { NotFoundError } = require("../../errors/index.js");
 
 // Add a plan
 exports.addPlan = async (req, res) => {
   const { plan_type, inr_price, validity } = req.body;
   const plan = await PlanModel.create({ plan_type, inr_price, validity });
+
+  if (!plan) {
+    throw new BadRequestError("Plan not created");
+  }
+
+  // create a course corresponding to this plan
+  const course = await courseModel.create({
+    plan: plan._id,
+    title: plan.plan_type,
+  });
+
+  if (!course) {
+    throw new BadRequestError("Course not created");
+  }
 
   res.status(StatusCodes.CREATED).json({
     success: true,
@@ -46,6 +61,7 @@ exports.updatePlan = async (req, res, next) => {
     throw new NotFoundError("Plan not found");
   }
   if (inr_price) plan.inr_price = inr_price;
+
   await plan.save();
 
   res.status(StatusCodes.OK).json({

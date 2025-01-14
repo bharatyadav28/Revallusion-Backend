@@ -84,5 +84,6 @@ exports.attachTempTokenToCookies = ({ res, tempToken }) => {
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + tempTime),
     signed: true,
+    // sameSite: "None",
   });
 };
