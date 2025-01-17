@@ -195,7 +195,9 @@ exports.updateVideo = async (req, res, next) => {
   let { title, description, thumbnailUrl, course, module, subModule } =
     req.body;
 
+  if (!course) throw new BadRequestError("Please enter course id");
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
+  let isIntroductory = false;
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
@@ -228,6 +230,7 @@ exports.updateVideo = async (req, res, next) => {
       _id: course,
     });
     const isTargetCourseFree = targetExistingCourse.isFree;
+    isIntroductory = isTargetCourseFree;
     const targetCourseVideos = !isTargetCourseFree
       ? getSubModuleVideos({
           modules: targetExistingCourse.modules,
@@ -244,9 +247,9 @@ exports.updateVideo = async (req, res, next) => {
   if (title) video.title = title;
   if (description) video.description = description;
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
-  video.course = course || null;
-  video.module = module || null;
-  video.subModule = subModule || null;
+  video.course = course;
+  video.module = isIntroductory || !module ? null : module;
+  video.subModule = isIntroductory || !subModule ? null : subModule;
 
   await video.save();
 
