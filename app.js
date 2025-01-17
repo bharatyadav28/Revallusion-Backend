@@ -14,7 +14,7 @@ dotenv.config({ path: "./config/config.env" });
 app.use(express.json());
 app.use(
   cors({
-    origin: ["*"],
+    origin: "*",
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
   })

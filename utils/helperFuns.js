@@ -79,3 +79,8 @@ exports.appendBucketName = (url) => {
 exports.StringToObjectId = (str) => {
   return new mongoose.Types.ObjectId(str);
 };
+
+exports.clearCookies = ({ res }) => {
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+};

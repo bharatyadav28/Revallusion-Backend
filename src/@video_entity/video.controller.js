@@ -29,6 +29,7 @@ const getSubModuleVideos = ({ modules, module, subModule }) => {
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
   const { videoExtension } = req.body;
+  console.log("req", req.body);
 
   if (!videoExtension) {
     throw new BadRequestError("Please enter video extension");
@@ -44,7 +45,7 @@ exports.getUploadURL = async (req, res, next) => {
 
 // Fetch all videos
 exports.getVideos = async (req, res, next) => {
-  const videos = await VideoModel.aggregate([
+  const videosQuery = VideoModel.aggregate([
     {
       // Stage 1, fetch videos
       $match: { isDeleted: false },
@@ -62,9 +63,13 @@ exports.getVideos = async (req, res, next) => {
     },
   ]);
 
+  const coursesQuery = courseModel.find().select("title modules");
+
+  const [videos, courses] = await Promise.all([videosQuery, coursesQuery]);
+
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { videos },
+    data: { videos, courses },
     message: "Videos fetch successfully",
   });
 };
@@ -102,8 +107,8 @@ exports.saveVideo = async (req, res, next) => {
     subModule,
   } = req.body;
 
-  if (!course) {
-    throw new BadRequestError("Please enter course id");
+  if (!title || !description || !thumbnailUrl || !videoUrl || !course) {
+    throw new BadRequestError("Please enter all required fields");
   }
 
   // Find existing course
@@ -187,8 +192,10 @@ exports.updateVideo = async (req, res, next) => {
   }
 
   // New Incoming data
-  const { title, description, thumbnailUrl, course, module, subModule } =
+  let { title, description, thumbnailUrl, course, module, subModule } =
     req.body;
+
+  if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
