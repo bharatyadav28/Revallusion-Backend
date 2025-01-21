@@ -29,7 +29,6 @@ const getSubModuleVideos = ({ modules, module, subModule }) => {
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
   const { videoExtension } = req.body;
-  console.log("req", req.body);
 
   if (!videoExtension) {
     throw new BadRequestError("Please enter video extension");
@@ -105,6 +104,7 @@ exports.saveVideo = async (req, res, next) => {
     course,
     module,
     subModule,
+    duration,
   } = req.body;
 
   if (!title || !description || !thumbnailUrl || !videoUrl || !course) {
@@ -131,6 +131,7 @@ exports.saveVideo = async (req, res, next) => {
     course,
     module,
     subModule,
+    duration,
   };
 
   if (!isFreeCourse) {
@@ -326,6 +327,13 @@ exports.deleteAllVideos = async (req, res, next) => {
   try {
     // Delete all videos
     await VideoModel.deleteMany({});
+
+    const videos = await VideoModel.find({});
+    for (let video of videos) {
+      await s3delete(video.videoUrl);
+      await s3delete(video.thumbnailUrl);
+      await VideoModel.deleteOne({ _id: video._id });
+    }
 
     // Fetch all courses as Mongoose documents
     const existingCourses = await courseModel.find({}); // Ensure no .lean() is used

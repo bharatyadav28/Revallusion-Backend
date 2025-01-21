@@ -22,6 +22,14 @@ const videoSchema = new mongoose.Schema(
       required: [true, "Please provide video url"],
       trim: true,
     },
+    duration: {
+      type: Object,
+      default: {
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+      },
+    },
     course: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Course",
