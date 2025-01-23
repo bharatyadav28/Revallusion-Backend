@@ -10,6 +10,7 @@ const {
   getVideos,
   permanatelyDeleteVideo,
   deleteAllVideos,
+  updateActiveStatus,
 } = require("./video.controller.js");
 
 const router = express.Router();
@@ -18,7 +19,7 @@ router.route("/get-upload-url").post(auth, isAdmin, getUploadURL);
 
 router.route("/").get(getVideos).post(saveVideo);
 
-//NOTE: Dev purpose
+//NOTE: only for Dev purpose
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
 
 router
@@ -26,6 +27,8 @@ router
   .get(getVideo)
   .delete(auth, isAdmin, deleteVideo)
   .put(auth, isAdmin, updateVideo);
+
+router.route("/active-status/:id").put(auth, isAdmin, updateActiveStatus);
 
 router
   .route("/permanently-delete/:id")

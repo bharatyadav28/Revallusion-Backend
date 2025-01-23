@@ -1,5 +1,5 @@
 const { generateUploadURL, s3delete } = require("../../utils/s3.js");
-const { BadRequestError } = require("../../errors/index.js");
+const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const VideoModel = require("./video.model.js");
 const courseModel = require("../@course_entity/course.model.js");
 const { StatusCodes } = require("http-status-codes");
@@ -159,17 +159,21 @@ exports.saveVideo = async (req, res, next) => {
     });
 
     // Check if video already exists
-    const videoIndex = existingVideos.findIndex((v) => v._id === video._id);
+    const videoIndex = existingVideos.findIndex((v) => v.videoId === video._id);
     if (videoIndex !== -1) {
       throw new BadRequestError("Video already exists");
     }
 
-    existingVideos.push(video._id);
+    const latestSequence = courseModel.getLatestSequenceNumber(existingVideos);
+
+    existingVideos.push({ videoId: video._id, sequence: latestSequence + 1 });
     await existingCourse.save();
   } else {
     // Add video id to Intoductory (free videos)
     const freeVideos = existingCourse.freeVideos;
-    freeVideos.push(video.id);
+
+    const latestSequence = courseModel.getLatestSequenceNumber(freeVideos);
+    freeVideos.push({ videoId: video._id, sequence: latestSequence + 1 });
     await existingCourse.save();
   }
 
@@ -217,13 +221,16 @@ exports.updateVideo = async (req, res, next) => {
         })
       : sourceCourse.freeVideos;
 
-    const videoIndex = sourceCourseVideos.findIndex((v) =>
-      v._id.equals(videoId)
+    // Video in sub-module
+    const videoEntry = sourceCourseVideos.find((v) =>
+      v.videoId.equals(videoId)
     );
 
-    if (videoIndex !== -1) {
-      sourceCourseVideos.splice(videoIndex, 1);
-    }
+    courseModel.removeItemSequence({
+      arr: sourceCourseVideos,
+      toRemoveItem: videoEntry,
+      isVideo: true,
+    });
     await sourceCourse.save();
 
     // Push video id to target course
@@ -232,6 +239,7 @@ exports.updateVideo = async (req, res, next) => {
     });
     const isTargetCourseFree = targetExistingCourse.isFree;
     isIntroductory = isTargetCourseFree;
+
     const targetCourseVideos = !isTargetCourseFree
       ? getSubModuleVideos({
           modules: targetExistingCourse.modules,
@@ -240,7 +248,13 @@ exports.updateVideo = async (req, res, next) => {
         })
       : targetExistingCourse.freeVideos;
 
-    targetCourseVideos.push(video.id);
+    const latestSequence =
+      courseModel.getLatestSequenceNumber(targetCourseVideos);
+    targetCourseVideos.push({
+      videoId: video._id,
+      sequence: latestSequence + 1,
+    });
+
     await targetExistingCourse.save();
   }
 
@@ -279,12 +293,19 @@ exports.deleteVideo = async (req, res, next) => {
     subModule: video.subModule,
   });
 
-  const videoIndex = existingVideos.findIndex((v) => v.equals(video._id));
-  if (videoIndex === -1) {
-    throw new BadRequestError("Video not found in submodule");
+  console.log("Existing videos", existingVideos);
+
+  const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
+  if (!videoEntry) {
+    throw new BadRequestError("Video doesn't exists in submodule");
   }
 
-  existingVideos.splice(videoIndex, 1);
+  courseModel.removeItemSequence({
+    arr: existingVideos,
+    toRemoveItem: videoEntry,
+    isVideo: true,
+  });
+
   await existingCourse.save();
 
   // Video data (soft delete)
@@ -298,6 +319,54 @@ exports.deleteVideo = async (req, res, next) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Video deleted successfully",
+  });
+};
+
+// Change active status of video
+exports.updateActiveStatus = async (req, res, next) => {
+  const videoId = req.params.id;
+  const { isActive } = req.body;
+
+  const video = await VideoModel.findOne({ _id: videoId, isDeleted: false });
+  if (!video) {
+    throw new NotFoundError("Video not found");
+  }
+  if (video.isActive === isActive) {
+    throw new BadRequestError("Video status is already " + isActive);
+  }
+
+  const existingCourse = await courseModel.findById(video.course);
+  const existingVideos = getSubModuleVideos({
+    modules: existingCourse.modules,
+    module: video.module,
+    subModule: video.subModule,
+  });
+
+  const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
+  if (!videoEntry) {
+    throw new BadRequestError("Video doesn't exists in submodule");
+  }
+
+  if (isActive === false) {
+    courseModel.removeItemSequence({
+      arr: existingVideos,
+      toRemoveItem: videoEntry,
+      isVideo: true,
+      makeInactive: true,
+    });
+  } else {
+    const latestSequence = courseModel.getLatestSequenceNumber(existingVideos);
+    videoEntry.sequence = latestSequence + 1;
+  }
+
+  await existingCourse.save();
+
+  video.isActive = isActive;
+  await video.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Video status updated successfully",
   });
 };
 

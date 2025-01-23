@@ -40,6 +40,10 @@ const videoSchema = new mongoose.Schema(
     subModule: {
       type: String,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
 
     isDeleted: {
       type: Boolean,
