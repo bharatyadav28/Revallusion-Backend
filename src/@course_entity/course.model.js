@@ -6,7 +6,7 @@ const CourseVideoSchema = new mongoose.Schema(
   {
     videoId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "video",
+      ref: "Video",
       required: [true, "Please provide video id"],
     },
     sequence: {
@@ -29,6 +29,9 @@ const SubmodulesSchema = new mongoose.Schema({
     trim: true,
   },
   videos: [CourseVideoSchema],
+  thumbnailUrl: {
+    type: String,
+  },
   sequence: {
     type: Number,
     required: [true, "Please enter sub-module sequence"],
@@ -86,7 +89,7 @@ CourseSchema.statics.getLatestSequenceNumber = function (arr) {
     }, arr[0].sequence);
   }
 
-  return latestSequence;
+  return latestSequence > 0 ? latestSequence : 0;
 };
 
 CourseSchema.statics.removeItemSequence = function ({

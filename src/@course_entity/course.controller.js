@@ -34,15 +34,30 @@ exports.getCourses = async (req, res) => {
   });
 };
 
+// Get courses names
+exports.getCoursesNames = async (req, res) => {
+  const courses = await courseModel.find().select("title isFree");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { courses },
+  });
+};
+
 // Get a single course
 exports.getCourse = async (req, res) => {
-  const course = await courseModel.findById(req.params.id);
+  const course = await courseModel
+    .findById(req.params.id)
+    .populate("modules.subModules.videos.videoId")
+    .populate("freeVideos.videoId")
+    .lean();
   if (!course) {
     throw new NotFoundError("Course not found");
   }
+
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { course },
+    data: { course: course },
   });
 };
 
@@ -81,6 +96,28 @@ exports.addModule = async (req, res) => {
     success: true,
     message: "Module added successfully",
     data: course,
+  });
+};
+
+// Update module name
+exports.updateModuleName = async (req, res) => {
+  const { name, courseId } = req.body;
+  const { id: moduleId } = req.params;
+
+  const course = await courseModel.findOne({
+    _id: courseId,
+  });
+  if (!course) throw new NotFoundError("Requested course may not exists");
+
+  const module = course.modules.id(moduleId);
+  if (!module) throw new NotFoundError("Requested module may not exists");
+
+  module.name = name;
+  await course.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Module name updated successfully",
   });
 };
 
@@ -239,5 +276,77 @@ exports.updateSubModule = async (req, res) => {
     message: "Submodule updated successfully",
     course: course,
     subModule: subModule,
+  });
+};
+
+exports.updateVideoSequence = async (req, res) => {
+  let { courseId, moduleId, subModuleId, sequence } = req.body;
+
+  if (!courseId) {
+    throw new BadRequestError("Please enter courseid, moduleId and sourceId");
+  }
+
+  const videoId = req.params.id;
+
+  const course = await courseModel.findOne({
+    _id: courseId,
+  });
+  if (!course) throw new NotFoundError("Requested course may not exists");
+
+  if (sequence < 0) {
+    throw new BadRequestError("Negative sequence number not allowed");
+  }
+
+  let videos = course.freeVideos;
+
+  if (!course.isFree) {
+    if (!moduleId || !subModuleId) {
+      throw new BadRequestError("Please enter moduleId and sourceId");
+    }
+
+    const module = course.modules.id(moduleId);
+    if (!module) throw new NotFoundError("Requested module may not exists");
+
+    const subModule = module.subModules.id(subModuleId);
+    if (!subModule)
+      throw new NotFoundError("Requested submodule may not exists");
+
+    videos = subModule.videos;
+  }
+
+  const existingVideo = videos.find((video) => video.videoId.equals(videoId));
+  if (!existingVideo) {
+    throw new BadRequestError("Video doesn't exists in submodule");
+  }
+
+  const currentSequence = existingVideo.sequence;
+  const latestSequence = courseModel.getLatestSequenceNumber(videos);
+
+  if (sequence > latestSequence) sequence = latestSequence;
+
+  if (sequence < currentSequence) {
+    // If new sequence is less than current sequence, increment required videos sequences
+    videos.forEach((video) => {
+      if (video.sequence >= sequence && video.sequence < currentSequence) {
+        video.sequence += 1;
+      }
+    });
+  } else {
+    // If new sequence is greater than current sequence, decrement required submodule sequences
+    videos.forEach((video) => {
+      if (video.sequence <= sequence && video.sequence > currentSequence) {
+        video.sequence -= 1;
+      }
+    });
+  }
+
+  // Assign this sequence to this item
+  existingVideo.sequence = sequence;
+
+  await course.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Video sequence updated successfully",
   });
 };

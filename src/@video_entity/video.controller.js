@@ -293,8 +293,6 @@ exports.deleteVideo = async (req, res, next) => {
     subModule: video.subModule,
   });
 
-  console.log("Existing videos", existingVideos);
-
   const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
   if (!videoEntry) {
     throw new BadRequestError("Video doesn't exists in submodule");
