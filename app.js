@@ -30,10 +30,12 @@ app.get("/", (req, res, next) =>
 const heroSectionRouter = require("./src/@hero_section_entity/heroSection.index");
 const mentorRouter = require("./src/@mentor_entity/mentor.index");
 const carousalRouter = require("./src/@carousal_entity/carousal.index");
+const latestTutorialsRouter = require("./src/@latest_tutorials_entity/latest_tutorials.index");
 const faqRouter = require("./src/@faq_entity/faq.index");
 const pageRouter = require("./src/@page_entity/page.index");
 const planRouter = require("./src/@plan_entity/plan.index");
 const certificateAddRouter = require("./src/@certificate_add_entity/certificateAdd.index");
+
 const moduleRouter = require("./src/@module_entity/module.index");
 const queryRouter = require("./src/@query_entity/query.index");
 const userRouter = require("./src/@user_entity/user.index");
@@ -46,6 +48,7 @@ const courseRouter = require("./src/@course_entity/course.index");
 app.use("/api/v1/content/hero-section", heroSectionRouter);
 app.use("/api/v1/content/mentor", mentorRouter);
 app.use("/api/v1/content/carousal", carousalRouter);
+app.use("/api/v1/content/latest-tutorials", latestTutorialsRouter);
 app.use("/api/v1/content/faq", faqRouter);
 app.use("/api/v1/content/page", pageRouter);
 app.use("/api/v1/content/plan", planRouter);

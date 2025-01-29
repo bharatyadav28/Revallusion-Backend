@@ -84,3 +84,32 @@ exports.clearCookies = ({ res }) => {
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
 };
+
+// Update sequence of item in an array
+exports.updateSequence = ({
+  arr,
+  currentSequence,
+  latestSequence,
+  newSequence,
+}) => {
+  let sequence = newSequence;
+  if (sequence > latestSequence) sequence = latestSequence;
+
+  if (sequence < currentSequence) {
+    // If new sequence is less than current sequence, increment required videos sequences
+    arr.forEach((item) => {
+      if (item.sequence >= sequence && item.sequence < currentSequence) {
+        item.sequence += 1;
+      }
+    });
+  } else {
+    // If new sequence is greater than current sequence, decrement required submodule sequences
+    arr.forEach((item) => {
+      if (item.sequence <= sequence && item.sequence > currentSequence) {
+        item.sequence -= 1;
+      }
+    });
+  }
+
+  return sequence;
+};

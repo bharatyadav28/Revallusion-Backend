@@ -2,7 +2,10 @@ const { StatusCodes } = require("http-status-codes");
 
 const courseModel = require("./course.model.js");
 const { NotFoundError, BadRequestError } = require("../../errors/index.js");
-const { StringToObjectId } = require("../../utils/helperFuns.js");
+const {
+  StringToObjectId,
+  updateSequence,
+} = require("../../utils/helperFuns.js");
 const VideoModel = require("../@video_entity/video.model.js");
 
 // Add a course
@@ -322,23 +325,30 @@ exports.updateVideoSequence = async (req, res) => {
   const currentSequence = existingVideo.sequence;
   const latestSequence = courseModel.getLatestSequenceNumber(videos);
 
-  if (sequence > latestSequence) sequence = latestSequence;
+  sequence = updateSequence({
+    arr: videos,
+    currentSequence,
+    latestSequence,
+    newSequence: sequence,
+  });
 
-  if (sequence < currentSequence) {
-    // If new sequence is less than current sequence, increment required videos sequences
-    videos.forEach((video) => {
-      if (video.sequence >= sequence && video.sequence < currentSequence) {
-        video.sequence += 1;
-      }
-    });
-  } else {
-    // If new sequence is greater than current sequence, decrement required submodule sequences
-    videos.forEach((video) => {
-      if (video.sequence <= sequence && video.sequence > currentSequence) {
-        video.sequence -= 1;
-      }
-    });
-  }
+  // if (sequence > latestSequence) sequence = latestSequence;
+
+  // if (sequence < currentSequence) {
+  //   // If new sequence is less than current sequence, increment required videos sequences
+  //   videos.forEach((video) => {
+  //     if (video.sequence >= sequence && video.sequence < currentSequence) {
+  //       video.sequence += 1;
+  //     }
+  //   });
+  // } else {
+  //   // If new sequence is greater than current sequence, decrement required submodule sequences
+  //   videos.forEach((video) => {
+  //     if (video.sequence <= sequence && video.sequence > currentSequence) {
+  //       video.sequence -= 1;
+  //     }
+  //   });
+  // }
 
   // Assign this sequence to this item
   existingVideo.sequence = sequence;

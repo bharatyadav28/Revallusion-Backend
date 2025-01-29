@@ -4,7 +4,6 @@ const express = require("express");
 const {
   addCarousalData,
   getCarousals,
-  getCarousal,
   deleteCarousal,
   updateCarousal,
 } = require("./carousal.controller");
@@ -16,7 +15,6 @@ router.route("/").post(auth, isAdmin, addCarousalData).get(getCarousals);
 router
   .route("/:id")
   .delete(auth, isAdmin, deleteCarousal)
-  .put(auth, isAdmin, updateCarousal)
-  .get(getCarousal);
+  .put(auth, isAdmin, updateCarousal);
 
 module.exports = router;

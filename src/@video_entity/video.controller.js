@@ -107,17 +107,9 @@ exports.saveVideo = async (req, res, next) => {
     duration,
   } = req.body;
 
-  if (!title || !description || !thumbnailUrl || !videoUrl || !course) {
+  if (!title || !description || !thumbnailUrl || !videoUrl) {
     throw new BadRequestError("Please enter all required fields");
   }
-
-  // Find existing course
-  const existingCourse = await courseModel.findById(course);
-  if (!existingCourse) {
-    throw new BadRequestError("Course not found");
-  }
-
-  const isFreeCourse = existingCourse.isFree;
 
   // Extract keys from url
   if (videoUrl) videoUrl = extractURLKey(videoUrl);
@@ -128,24 +120,45 @@ exports.saveVideo = async (req, res, next) => {
     description,
     thumbnailUrl,
     videoUrl,
-    course,
+    course: course || null,
     module,
     subModule,
     duration,
   };
 
-  if (!isFreeCourse) {
+  let isFreeCourse = false;
+  let existingCourse = null;
+
+  // Find existing course
+  if (course) {
+    existingCourse = await courseModel.findById(course);
+    if (course && !existingCourse) {
+      throw new BadRequestError("Course not found");
+    }
+    isFreeCourse = existingCourse.isFree;
+  }
+
+  if (existingCourse && !isFreeCourse) {
     if (!module) throw new BadRequestError("Please enter module id");
     if (!subModule) throw new BadRequestError("Please enter submodule id");
 
     videoData.module = module;
     videoData.subModule = subModule;
   }
+
   // Save video
   const video = await VideoModel.create(videoData);
 
   if (!video) {
     throw new BadRequestError("Video not saved");
+  }
+
+  // Video doesnot belong to any course
+  if (!existingCourse) {
+    return res.status(StatusCodes.CREATED).json({
+      success: true,
+      message: "Video saved successfully",
+    });
   }
 
   //  Add video id to corrsponsding course
@@ -200,71 +213,76 @@ exports.updateVideo = async (req, res, next) => {
   let { title, description, thumbnailUrl, course, module, subModule } =
     req.body;
 
-  if (!course) throw new BadRequestError("Please enter course id");
+  // if (!course) throw new BadRequestError("Please enter course id");
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
   let isIntroductory = false;
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
-    !video.course.equals(StringToObjectId(course)) ||
+    !video?.course?.equals(StringToObjectId(course)) ||
     video.module !== module ||
     video.subModule !== subModule;
 
   if (isVideoLocationUpdated) {
-    const sourceCourse = await courseModel.findById(video.course);
-    const isSourceCourseFree = sourceCourse.isFree;
-    const sourceCourseVideos = !isSourceCourseFree
-      ? getSubModuleVideos({
-          modules: sourceCourse.modules,
-          module: video.module,
-          subModule: video.subModule,
-        })
-      : sourceCourse.freeVideos;
+    // Remove video from source course if exists
+    if (video.course) {
+      const sourceCourse = await courseModel.findById(video.course);
+      const isSourceCourseFree = sourceCourse.isFree;
+      const sourceCourseVideos = !isSourceCourseFree
+        ? getSubModuleVideos({
+            modules: sourceCourse.modules,
+            module: video.module,
+            subModule: video.subModule,
+          })
+        : sourceCourse.freeVideos;
 
-    // Video in sub-module
-    const videoEntry = sourceCourseVideos.find((v) =>
-      v.videoId.equals(videoId)
-    );
+      // Video in sub-module
+      const videoEntry = sourceCourseVideos.find((v) =>
+        v.videoId.equals(videoId)
+      );
 
-    courseModel.removeItemSequence({
-      arr: sourceCourseVideos,
-      toRemoveItem: videoEntry,
-      isVideo: true,
-    });
-    await sourceCourse.save();
+      courseModel.removeItemSequence({
+        arr: sourceCourseVideos,
+        toRemoveItem: videoEntry,
+        isVideo: true,
+      });
+      await sourceCourse.save();
+    }
 
     // Push video id to target course
-    const targetExistingCourse = await courseModel.findOne({
-      _id: course,
-    });
-    const isTargetCourseFree = targetExistingCourse.isFree;
-    isIntroductory = isTargetCourseFree;
+    if (course) {
+      const targetExistingCourse = await courseModel.findOne({
+        _id: course,
+      });
+      const isTargetCourseFree = targetExistingCourse.isFree;
+      isIntroductory = isTargetCourseFree;
 
-    const targetCourseVideos = !isTargetCourseFree
-      ? getSubModuleVideos({
-          modules: targetExistingCourse.modules,
-          module,
-          subModule,
-        })
-      : targetExistingCourse.freeVideos;
+      const targetCourseVideos = !isTargetCourseFree
+        ? getSubModuleVideos({
+            modules: targetExistingCourse.modules,
+            module,
+            subModule,
+          })
+        : targetExistingCourse.freeVideos;
 
-    const latestSequence =
-      courseModel.getLatestSequenceNumber(targetCourseVideos);
-    targetCourseVideos.push({
-      videoId: video._id,
-      sequence: latestSequence + 1,
-    });
+      const latestSequence =
+        courseModel.getLatestSequenceNumber(targetCourseVideos);
+      targetCourseVideos.push({
+        videoId: video._id,
+        sequence: latestSequence + 1,
+      });
 
-    await targetExistingCourse.save();
+      await targetExistingCourse.save();
+    }
   }
 
   // Save video(Model)
   if (title) video.title = title;
   if (description) video.description = description;
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
-  video.course = course;
-  video.module = isIntroductory || !module ? null : module;
-  video.subModule = isIntroductory || !subModule ? null : subModule;
+  video.course = course || null;
+  video.module = isIntroductory || !course || !module ? null : module;
+  video.subModule = isIntroductory || !course || !subModule ? null : subModule;
 
   await video.save();
 
@@ -390,6 +408,7 @@ exports.permanatelyDeleteVideo = async (req, res, next) => {
   });
 };
 
+// Permanently delete all videos
 exports.deleteAllVideos = async (req, res, next) => {
   try {
     // Delete all videos
@@ -422,4 +441,25 @@ exports.deleteAllVideos = async (req, res, next) => {
   } catch (error) {
     next(error); // Pass error to error-handling middleware
   }
+};
+
+// Get video list with specific fields
+exports.getVideoList = async (req, res, next) => {
+  const { search } = req.query;
+
+  let query = { isDeleted: false };
+  if (search) {
+    query.$or = [
+      { title: { $regex: search, $options: "i" } },
+      { description: { $regex: search, $options: "i" } },
+    ];
+  }
+
+  const videos = await VideoModel.find(query).select("title description");
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { videos },
+    message: "Videos fetch successfully",
+  });
 };

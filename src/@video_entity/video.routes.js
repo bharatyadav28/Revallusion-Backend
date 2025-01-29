@@ -11,6 +11,7 @@ const {
   permanatelyDeleteVideo,
   deleteAllVideos,
   updateActiveStatus,
+  getVideoList,
 } = require("./video.controller.js");
 
 const router = express.Router();
@@ -21,6 +22,8 @@ router.route("/").get(getVideos).post(saveVideo);
 
 //NOTE: only for Dev purpose
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
+
+router.route("/list").get(getVideoList);
 
 router
   .route("/:id")

@@ -1,74 +1,124 @@
 const { StatusCodes } = require("http-status-codes");
 
 const CarousalModel = require("./carousal.model.js");
+const CourseModel = require("../@course_entity/course.model.js");
 const { NotFoundError } = require("../../errors/index.js");
+const {
+  StringToObjectId,
+  updateSequence,
+} = require("../../utils/helperFuns.js");
 
 // Add a carousal
 exports.addCarousalData = async (req, res) => {
-  const { sequence, caption, description, key_points } = req.body;
-  await CarousalModel.create({
-    sequence,
-    caption,
-    description,
-    key_points,
-  });
+  const { videos: newVideos } = req.body;
 
-  return res.status(StatusCodes.CREATED).json({
+  if (newVideos.length == 0) {
+    throw new BadRequestError("Please enter videos");
+  }
+
+  let carousals = await CarousalModel.findOne();
+  if (!carousals) {
+    carousals = await CarousalModel.create({ videos: [] });
+
+    if (!carousals) {
+      throw new BadRequestError("Something went wrong in creating carousals");
+    }
+  }
+
+  const carousalsVideos = carousals.videos;
+  const latestSequence = CourseModel.getLatestSequenceNumber(carousalsVideos);
+
+  for (let i = 0; i < newVideos.length; i++) {
+    newVideos[i].sequence = latestSequence + i + 1;
+  }
+
+  carousals.videos = [...carousalsVideos, ...newVideos];
+
+  await carousals.save();
+
+  res.status(StatusCodes.OK).json({
     success: true,
-    message: "Carousal Created Successfully",
+    message: "Carousal added successfully",
   });
 };
 
 // Get all carousals
 exports.getCarousals = async (req, res) => {
-  const carousals = await CarousalModel.find({}).sort({ createdAt: -1 });
+  const carousals = await CarousalModel.findOne().populate("videos.videoId");
 
-  return res
-    .status(StatusCodes.OK)
-    .json({ success: true, data: { carousals, count: carousals.length } });
-};
-
-// Get single carousals
-exports.getCarousal = async (req, res) => {
-  const id = req.params.id;
-  const carousal = await CarousalModel.findById(id);
-
-  if (!carousal) {
-    throw new NotFoundError("Carousal not found");
-  }
-
-  return res.status(StatusCodes.OK).json({ success: true, data: { carousal } });
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Carousals fetched successfully",
+    data: { carousals },
+  });
 };
 
 // Update a carousal
 exports.updateCarousal = async (req, res) => {
-  const id = req.params.id;
-  const { sequence, caption, description, key_points } = req.body;
-  const carousal = await CarousalModel.findByIdAndUpdate(
-    id,
-    { sequence, caption, description, key_points },
-    { new: true }
-  );
+  const { id: videoId } = req.params;
+  let { sequence } = req.body;
 
-  if (!carousal) {
-    throw new NotFoundError("Carousal not found");
+  const carousals = await CarousalModel.findOne();
+  if (!carousals) {
+    throw new BadRequestError("No carosual array exists");
   }
 
-  return res
-    .status(StatusCodes.OK)
-    .json({ success: true, message: "Carousal Updated Successfully" });
+  const carousalsVideos = carousals.videos;
+
+  const existingVideo = carousalsVideos.find((v) =>
+    v.videoId.equals(StringToObjectId(videoId))
+  );
+  if (!existingVideo) {
+    throw new BadRequestError("Video doesn't exists in the tutorial");
+  }
+
+  const currentSequence = existingVideo.sequence;
+  const latestSequence = CourseModel.getLatestSequenceNumber(carousalsVideos);
+
+  sequence = updateSequence({
+    arr: carousalsVideos,
+    currentSequence,
+    latestSequence,
+    newSequence: sequence,
+  });
+
+  existingVideo.sequence = sequence;
+
+  await carousals.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Carousal sequence updated successfully",
+  });
 };
 
 // Delete a carousal
 exports.deleteCarousal = async (req, res) => {
-  const id = req.params.id;
-  const carousal = await CarousalModel.findByIdAndDelete(id);
+  const { id: videoId } = req.params;
 
-  if (!carousal) {
-    throw new NotFoundError("Carousal not found");
+  const carousals = await CarousalModel.findOne();
+  if (!carousals) {
+    throw new BadRequestError("No carosual array exists");
   }
 
-  return res
-    .status(StatusCodes.OK)
-    .json({ success: true, message: "Carousal Deleted Successfully" });
+  const existingVideos = carousals.videos;
+  const videoEntry = existingVideos.find((v) =>
+    v.videoId.equals(StringToObjectId(videoId))
+  );
+  if (!videoEntry) {
+    throw new BadRequestError("carousal doesn't exist");
+  }
+
+  CourseModel.removeItemSequence({
+    arr: existingVideos,
+    toRemoveItem: videoEntry,
+    isVideo: true,
+  });
+
+  await carousals.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Carosual removed successfully",
+  });
 };

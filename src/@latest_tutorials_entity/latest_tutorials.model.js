@@ -1,6 +1,6 @@
 const mongoose = require("mongoose");
 
-const CarousalVideoSchema = new mongoose.Schema(
+const LatestVideoSchema = new mongoose.Schema(
   {
     videoId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -16,13 +16,16 @@ const CarousalVideoSchema = new mongoose.Schema(
   { _id: false }
 );
 
-const CarousalSchema = new mongoose.Schema(
+const LatestTutorailsSchema = new mongoose.Schema(
   {
-    videos: [CarousalVideoSchema],
+    videos: [LatestVideoSchema],
   },
   { timestamps: true }
 );
 
-const CarousalModel = mongoose.model("Carousal", CarousalSchema);
+const LatestTutorailsModel = mongoose.model(
+  "LatestTutorails",
+  LatestTutorailsSchema
+);
 
-module.exports = CarousalModel;
+module.exports = LatestTutorailsModel;
