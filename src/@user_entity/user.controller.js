@@ -73,8 +73,9 @@ exports.getHomeContent = async (req, res, next) => {
 
   // Append bucket name to image
   const getCertificate = (certificate) => {
-    if (!certificate.image) return certificate;
-    return { ...data[5], image: appendBucketName(data[5]?.image) };
+    const imagePath = certificate?.image;
+    if (!imagePath) return certificate;
+    return { ...certificate, image: appendBucketName(imagePath) };
   };
 
   // Append bucket name to videos and thumbnail
