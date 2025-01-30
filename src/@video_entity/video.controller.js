@@ -304,25 +304,31 @@ exports.deleteVideo = async (req, res, next) => {
     throw new BadRequestError("Video not found");
   }
 
-  const existingCourse = await courseModel.findById(video.course);
-  const existingVideos = getSubModuleVideos({
-    modules: existingCourse.modules,
-    module: video.module,
-    subModule: video.subModule,
-  });
+  if (video.course) {
+    const existingCourse = await courseModel.findById(video.course);
+    const isCourseFree = existingCourse.isFree;
 
-  const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
-  if (!videoEntry) {
-    throw new BadRequestError("Video doesn't exists in submodule");
+    const existingVideos = !isCourseFree
+      ? getSubModuleVideos({
+          modules: existingCourse.modules,
+          module: video.module,
+          subModule: video.subModule,
+        })
+      : existingCourse.freeVideos;
+
+    const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
+    if (!videoEntry) {
+      throw new BadRequestError("Video doesn't exists in submodule");
+    }
+
+    courseModel.removeItemSequence({
+      arr: existingVideos,
+      toRemoveItem: videoEntry,
+      isVideo: true,
+    });
+
+    await existingCourse.save();
   }
-
-  courseModel.removeItemSequence({
-    arr: existingVideos,
-    toRemoveItem: videoEntry,
-    isVideo: true,
-  });
-
-  await existingCourse.save();
 
   // Video data (soft delete)
   video.isDeleted = true;
