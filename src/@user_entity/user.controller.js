@@ -2,6 +2,7 @@ const StatusCodes = require("http-status-codes");
 
 const HeroSectionModel = require("../@hero_section_entity/heroSection.model");
 const CarousalModel = require("../@carousal_entity/carousal.model");
+const LatestTutorialsModel = require("../@latest_tutorials_entity/latest_tutorials.model");
 const ModuleModel = require("../@module_entity/module.model");
 const PlanModel = require("../@plan_entity/plan.model");
 const MentorModel = require("../@mentor_entity/mentor.model");
@@ -33,42 +34,89 @@ const { appendBucketName } = require("../../utils/helperFuns.js");
 
 //  User's home page content
 exports.getHomeContent = async (req, res, next) => {
+  // Queries
   const heroSection = HeroSectionModel.findOne();
-  const carousal = CarousalModel.find();
+  const carousal = CarousalModel.findOne()
+    .populate({
+      path: "videos.videoId",
+      select: "title description thumbnailUrl videoUrl",
+    })
+    .lean();
+
+  const latestTutorials = LatestTutorialsModel.findOne()
+    .populate({
+      path: "videos.videoId",
+      select: "title description thumbnailUrl videoUrl",
+    })
+    .lean();
   const modules = ModuleModel.find();
   const plans = PlanModel.find();
-  const mentors = MentorModel.find();
+  const mentors = MentorModel.find().select("-curriculum");
+  const curriculum = MentorModel.findOne().select("curriculum");
   const certificate = CertficateAddModel.findOne().lean();
   const faqs = FaqModel.find();
   const mentor = await MentorModel.findOne();
 
+  // Fetching all data
   const data = await Promise.all([
     heroSection,
     carousal,
+    latestTutorials,
     modules,
     plans,
     mentors,
+    curriculum,
     certificate,
     faqs,
     mentor,
   ]);
 
+  // Append bucket name to image
   const getCertificate = (certificate) => {
     if (!certificate.image) return certificate;
     return { ...data[5], image: appendBucketName(data[5]?.image) };
+  };
+
+  // Append bucket name to videos and thumbnail
+  const generateFullURLs = (data) => {
+    let result = [];
+    if (data) {
+      result = data?.map((item) => {
+        return {
+          sequence: item.sequence,
+          video: {
+            ...item.videoId,
+            thumbnailUrl: appendBucketName(item.videoId.thumbnailUrl),
+            videoUrl: appendBucketName(item.videoId.videoUrl),
+          },
+        };
+      });
+    }
+    return result;
+  };
+
+  // Append bucket name to curriculum url
+  const generateCurriculumUrl = (data) => {
+    let curricullum = "";
+    if (data && data?.curriculum) {
+      curricullum = appendBucketName(data?.curriculum);
+    }
+    return curricullum;
   };
 
   res.status(StatusCodes.OK).json({
     success: true,
     data: {
       heroSection: data[0],
-      carousal: data[1],
-      modules: data[2],
-      plans: data[3],
-      mentors: data[4],
-      certificate: getCertificate(data[5]),
-      faqs: data[6],
-      mentor: data[7],
+      carousal: generateFullURLs(data[1]?.videos),
+      latestTutorials: generateFullURLs(data[2]?.videos),
+      modules: data[3],
+      plans: data[4],
+      mentors: data[5],
+      curriculum: generateCurriculumUrl(data[6]),
+      certificate: getCertificate(data[7]),
+      faqs: data[8],
+      mentor: data[9],
     },
     message: "Home content fetch successfully",
   });

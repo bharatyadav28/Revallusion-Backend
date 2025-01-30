@@ -2,6 +2,9 @@ const { StatusCodes } = require("http-status-codes");
 
 const MentorModel = require("./mentor.model.js");
 const { NotFoundError } = require("../../errors/index.js");
+const { appendBucketName } = require("../../utils/helperFuns.js");
+const { BadRequestError } = require("../../errors/index.js");
+const { s3AdminUploadv4 } = require("../../utils/s3");
 
 // Add or update mentor's data
 exports.addMentor = async (req, res) => {
@@ -32,7 +35,7 @@ exports.addMentor = async (req, res) => {
 
 // Get mentor's data
 exports.getMentorsData = async (req, res, next) => {
-  const mentor = await MentorModel.findOne();
+  const mentor = await MentorModel.findOne().select("-curriculum");
   if (!mentor) {
     throw new NotFoundError("Mentor's data not found");
   }
@@ -40,6 +43,52 @@ exports.getMentorsData = async (req, res, next) => {
     success: true,
     data: { mentor },
     message: "Mentor's data fetch successfully",
+  });
+};
+
+// Update curriculum link
+exports.updateCurriculum = async (req, res, next) => {
+  if (!req.file) {
+    throw new BadRequestError("Please upload an file");
+  }
+
+  const mentor = await MentorModel.findOne();
+  if (!mentor) {
+    throw new NotFoundError("Mentor's data  should be added first");
+  }
+
+  const curriculumPath = (await s3AdminUploadv4(req.file)).Key;
+
+  mentor.curriculum = curriculumPath;
+  await mentor.save();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Curriculum updated successfully",
+  });
+};
+
+// Get curriculum link
+exports.getCurriculum = async (req, res, next) => {
+  const mentor = await MentorModel.findOne().select("curriculum");
+  if (!mentor) {
+    throw new NotFoundError("Mentor's data  should be added first");
+  }
+
+  const curriculumPath = mentor.curriculum;
+
+  let curriculum = "";
+
+  if (curriculumPath) {
+    curriculum = appendBucketName(mentor.curriculum);
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Curriculum updated successfully",
+    data: {
+      curriculum: curriculum,
+    },
   });
 };
 

@@ -157,6 +157,7 @@ exports.s3AdminUploadv4 = async (file) => {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: key,
     Body: file.buffer,
+    ContentType: file.mimetype,
   };
 
   const data = await s3.upload(params).promise();

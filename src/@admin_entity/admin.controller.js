@@ -107,3 +107,21 @@ exports.uploadImage = async (req, res) => {
     message: "Image uploaded successfully",
   });
 };
+
+// Upload any type of file
+exports.uploadFile = async (req, res) => {
+  if (!req.file) {
+    throw new BadRequestError("Please upload an file");
+  }
+
+  const uploadResult = await s3AdminUploadv4(req.file);
+
+  // Generate image URL
+  const result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { imageUrl: result },
+    message: "Image uploaded successfully",
+  });
+};

@@ -31,6 +31,10 @@ const MentorSchema = new mongoose.Schema(
       trim: true,
     },
     networks: [networkSchema],
+    curriculum: {
+      type: String,
+      trim: true,
+    },
   },
   { timestamps: true }
 );
