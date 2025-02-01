@@ -79,51 +79,6 @@ exports.updateCourse = async (req, res) => {
   });
 };
 
-// Add new module in a course
-exports.addModule = async (req, res) => {
-  const { courseId, name } = req.body;
-
-  if (!name) {
-    throw new BadRequestError("Please enter module name");
-  }
-
-  const course = await courseModel.findOne({
-    _id: courseId,
-  });
-  if (!course) throw new NotFoundError("Target course doesn't exist");
-
-  course.modules.push({ name });
-  await course.save();
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Module added successfully",
-    data: course,
-  });
-};
-
-// Update module name
-exports.updateModuleName = async (req, res) => {
-  const { name, courseId } = req.body;
-  const { id: moduleId } = req.params;
-
-  const course = await courseModel.findOne({
-    _id: courseId,
-  });
-  if (!course) throw new NotFoundError("Requested course may not exists");
-
-  const module = course.modules.id(moduleId);
-  if (!module) throw new NotFoundError("Requested module may not exists");
-
-  module.name = name;
-  await course.save();
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Module name updated successfully",
-  });
-};
-
 // Add a submodule
 exports.addSubModule = async (req, res) => {
   const { courseId, moduleId, name, thumbnailUrl } = req.body;

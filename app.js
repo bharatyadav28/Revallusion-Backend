@@ -50,6 +50,8 @@ const userRouter = require("./src/@user_entity/user.index");
 const adminRouter = require("./src/@admin_entity/admin.index");
 const videoRouter = require("./src/@video_entity/video.index");
 const courseRouter = require("./src/@course_entity/course.index");
+const courseModuleRouter = require("./src/@course_module_entity/course_module.index");
+const submoduleRouter = require("./src/@submodule_entity/submodule.index");
 const orderRouter = require("./src/@order_entity/order.index");
 
 // Paths
@@ -69,6 +71,8 @@ app.use("/api/v1/query", queryRouter);
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/video", videoRouter);
+app.use("/api/v1/course/module", courseModuleRouter);
+app.use("/api/v1/course/submodule", submoduleRouter);
 app.use("/api/v1/course", courseRouter);
 
 app.use("/api/v1/order", orderRouter);
