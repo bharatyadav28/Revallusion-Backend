@@ -5,10 +5,17 @@ const dotenv = require("dotenv");
 const pageNotFound = require("./middlewares/pageNotFound");
 const cookieParser = require("cookie-parser");
 const path = require("path");
+const Razorpay = require("razorpay");
 require("express-async-errors");
 
 const app = express();
 dotenv.config({ path: "./config/config.env" });
+
+// Razorpay API
+exports.instance = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
+});
 
 // Predefined middlewares
 app.use(express.json());
@@ -21,6 +28,7 @@ app.use(
 );
 app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (req, res, next) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
@@ -42,6 +50,7 @@ const userRouter = require("./src/@user_entity/user.index");
 const adminRouter = require("./src/@admin_entity/admin.index");
 const videoRouter = require("./src/@video_entity/video.index");
 const courseRouter = require("./src/@course_entity/course.index");
+const orderRouter = require("./src/@order_entity/order.index");
 
 // Paths
 // Landing page static paths
@@ -61,6 +70,8 @@ app.use("/api/v1/user", userRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/video", videoRouter);
 app.use("/api/v1/course", courseRouter);
+
+app.use("/api/v1/order", orderRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);
