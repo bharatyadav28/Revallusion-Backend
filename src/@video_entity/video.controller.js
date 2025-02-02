@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { generateUploadURL, s3delete } = require("../../utils/s3.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const VideoModel = require("./video.model.js");
@@ -9,22 +10,7 @@ const {
   awsUrl,
   StringToObjectId,
 } = require("../../utils/helperFuns.js");
-
-const getSubModuleVideos = ({ modules, module, subModule }) => {
-  // Find existing module
-  const existingModule = modules.find((m) =>
-    m._id.equals(StringToObjectId(module))
-  );
-  if (!existingModule) throw new BadRequestError("Module not found");
-
-  // Find existing submodule
-  const existingSubModule = existingModule?.subModules.find((s) =>
-    s._id.equals(StringToObjectId(subModule))
-  );
-  if (!existingSubModule) throw new BadRequestError("Submodule not found");
-
-  return existingSubModule?.videos;
-};
+const CourseModel = require("../@course_entity/course.model.js");
 
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
@@ -62,7 +48,53 @@ exports.getVideos = async (req, res, next) => {
     },
   ]);
 
-  const coursesQuery = courseModel.find().select("title modules");
+  const coursesQuery = courseModel.aggregate([
+    {
+      $lookup: {
+        from: "coursemodules",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          // Nested lookup to get submodules for each module
+          { $project: { _id: 1, name: 1 } },
+          {
+            $lookup: {
+              from: "submodules",
+              localField: "_id",
+              foreignField: "module",
+              pipeline: [
+                // Sort submodules by sequence
+                { $sort: { sequence: 1 } },
+                // Nested lookup to get videos for each submodule
+                { $project: { _id: 1, name: 1 } },
+              ],
+              as: "submodules",
+            },
+          },
+        ],
+        as: "modules",
+      },
+    },
+    // Optional: Lookup for free videos directly associated with course
+    {
+      $lookup: {
+        from: "videos",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          {
+            $match: {
+              isActive: true,
+              isDeleted: false,
+              submodule: null, // Only get videos directly linked to course
+            },
+          },
+          { $sort: { sequence: 1 } },
+        ],
+        as: "freeVideos",
+      },
+    },
+  ]);
 
   const [videos, courses] = await Promise.all([videosQuery, coursesQuery]);
 
@@ -103,7 +135,7 @@ exports.saveVideo = async (req, res, next) => {
     videoUrl,
     course,
     module,
-    subModule,
+    submodule,
     duration,
   } = req.body;
 
@@ -121,9 +153,10 @@ exports.saveVideo = async (req, res, next) => {
     thumbnailUrl,
     videoUrl,
     course: course || null,
-    module,
-    subModule,
+    module: course && module ? module : null,
+    submodule: course && module ? submodule : null,
     duration,
+    sequence: 0,
   };
 
   let isFreeCourse = false;
@@ -138,12 +171,21 @@ exports.saveVideo = async (req, res, next) => {
     isFreeCourse = existingCourse.isFree;
   }
 
-  if (existingCourse && !isFreeCourse) {
-    if (!module) throw new BadRequestError("Please enter module id");
-    if (!subModule) throw new BadRequestError("Please enter submodule id");
+  if (existingCourse) {
+    if (!isFreeCourse) {
+      if (!module) throw new BadRequestError("Please enter module id");
+      if (!submodule) throw new BadRequestError("Please enter submodule id");
 
-    videoData.module = module;
-    videoData.subModule = subModule;
+      videoData.module = module;
+      videoData.submodule = submodule;
+    }
+
+    const sequence = await VideoModel.getNextSequence({
+      course,
+      submodule,
+    });
+
+    videoData.sequence = sequence;
   }
 
   // Save video
@@ -151,43 +193,6 @@ exports.saveVideo = async (req, res, next) => {
 
   if (!video) {
     throw new BadRequestError("Video not saved");
-  }
-
-  // Video doesnot belong to any course
-  if (!existingCourse) {
-    return res.status(StatusCodes.CREATED).json({
-      success: true,
-      message: "Video saved successfully",
-    });
-  }
-
-  //  Add video id to corrsponsding course
-  if (!isFreeCourse) {
-    // Find existing module
-
-    const existingVideos = getSubModuleVideos({
-      modules: existingCourse.modules,
-      module,
-      subModule,
-    });
-
-    // Check if video already exists
-    const videoIndex = existingVideos.findIndex((v) => v.videoId === video._id);
-    if (videoIndex !== -1) {
-      throw new BadRequestError("Video already exists");
-    }
-
-    const latestSequence = courseModel.getLatestSequenceNumber(existingVideos);
-
-    existingVideos.push({ videoId: video._id, sequence: latestSequence + 1 });
-    await existingCourse.save();
-  } else {
-    // Add video id to Intoductory (free videos)
-    const freeVideos = existingCourse.freeVideos;
-
-    const latestSequence = courseModel.getLatestSequenceNumber(freeVideos);
-    freeVideos.push({ videoId: video._id, sequence: latestSequence + 1 });
-    await existingCourse.save();
   }
 
   res.status(StatusCodes.CREATED).json({
@@ -210,70 +215,90 @@ exports.updateVideo = async (req, res, next) => {
   }
 
   // New Incoming data
-  let { title, description, thumbnailUrl, course, module, subModule } =
+  let { title, description, thumbnailUrl, course, module, submodule } =
     req.body;
 
-  // if (!course) throw new BadRequestError("Please enter course id");
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
+
   let isIntroductory = false;
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
     !video?.course?.equals(StringToObjectId(course)) ||
-    video.module !== module ||
-    video.subModule !== subModule;
+    video.module !== (module || null) ||
+    video.submodule !== (submodule || null);
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists
-    if (video.course) {
-      const sourceCourse = await courseModel.findById(video.course);
-      const isSourceCourseFree = sourceCourse.isFree;
-      const sourceCourseVideos = !isSourceCourseFree
-        ? getSubModuleVideos({
-            modules: sourceCourse.modules,
-            module: video.module,
-            subModule: video.subModule,
-          })
-        : sourceCourse.freeVideos;
 
-      // Video in sub-module
-      const videoEntry = sourceCourseVideos.find((v) =>
-        v.videoId.equals(videoId)
-      );
+    const session = await mongoose.startSession();
 
-      courseModel.removeItemSequence({
-        arr: sourceCourseVideos,
-        toRemoveItem: videoEntry,
-        isVideo: true,
+    try {
+      await session.withTransaction(async () => {
+        if (video.course) {
+          // Update sequences in old location
+          const oldQuery = {};
+          if (video.submodule) {
+            oldQuery.submodule = video.submodule;
+          } else if (video.course) {
+            oldQuery.course = video.course;
+            oldQuery.submodule = null;
+          }
+
+          await mongoose.model("Video").updateMany(
+            {
+              ...oldQuery,
+              sequence: { $gt: video.sequence },
+            },
+            { $inc: { sequence: -1 } },
+            { session }
+          );
+        }
+
+        const targetCourse = await CourseModel.findOne({
+          _id: course,
+        }).select("isFree");
+
+        if (!targetCourse) {
+          course = null;
+        }
+
+        const isTargetCourseFree = targetCourse?.isFree || false;
+
+        // Get new sequence for target location
+        const newSequence = await VideoModel.getNextSequence({
+          course,
+          submodule: !isTargetCourseFree ? submodule : null,
+        });
+
+        // Update video with new location and sequence
+        video.course = course || null;
+        video.module = !course
+          ? null
+          : isTargetCourseFree
+          ? null
+          : module || null;
+        video.submodule = !course
+          ? null
+          : isTargetCourseFree
+          ? null
+          : submodule || null;
+
+        video.sequence = !course ? 0 : newSequence;
+
+        await video.save({ session });
       });
-      await sourceCourse.save();
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
     }
 
-    // Push video id to target course
-    if (course) {
-      const targetExistingCourse = await courseModel.findOne({
-        _id: course,
-      });
-      const isTargetCourseFree = targetExistingCourse.isFree;
-      isIntroductory = isTargetCourseFree;
-
-      const targetCourseVideos = !isTargetCourseFree
-        ? getSubModuleVideos({
-            modules: targetExistingCourse.modules,
-            module,
-            subModule,
-          })
-        : targetExistingCourse.freeVideos;
-
-      const latestSequence =
-        courseModel.getLatestSequenceNumber(targetCourseVideos);
-      targetCourseVideos.push({
-        videoId: video._id,
-        sequence: latestSequence + 1,
-      });
-
-      await targetExistingCourse.save();
-    }
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      message: "Video updated successfully",
+    });
   }
 
   // Save video(Model)
@@ -282,7 +307,7 @@ exports.updateVideo = async (req, res, next) => {
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
   video.course = course || null;
   video.module = isIntroductory || !course || !module ? null : module;
-  video.subModule = isIntroductory || !course || !subModule ? null : subModule;
+  video.submodule = isIntroductory || !course || !submodule ? null : submodule;
 
   await video.save();
 
@@ -305,38 +330,45 @@ exports.deleteVideo = async (req, res, next) => {
   }
 
   if (video.course) {
-    const existingCourse = await courseModel.findById(video.course);
-    const isCourseFree = existingCourse.isFree;
+    const session = await mongoose.startSession();
 
-    const existingVideos = !isCourseFree
-      ? getSubModuleVideos({
-          modules: existingCourse.modules,
-          module: video.module,
-          subModule: video.subModule,
-        })
-      : existingCourse.freeVideos;
+    try {
+      await session.withTransaction(async () => {
+        // Update sequences in old location
+        const query = {};
+        if (video.submodule) {
+          query.submodule = video.submodule;
+        } else if (video.course) {
+          query.course = video.course;
+          query.submodule = null;
+        }
 
-    const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
-    if (!videoEntry) {
-      throw new BadRequestError("Video doesn't exists in submodule");
+        await VideoModel.updateMany(
+          {
+            ...query,
+            sequence: { $gt: video.sequence },
+          },
+          { $inc: { sequence: -1 } },
+          { session }
+        );
+
+        // Update video with new location and sequence
+        video.course = null;
+        video.submodule = null;
+        video.module = null;
+        video.sequence = -1;
+        video.isDeleted = true;
+        video.deletedAt = Date.now();
+
+        await video.save({ session });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
     }
-
-    courseModel.removeItemSequence({
-      arr: existingVideos,
-      toRemoveItem: videoEntry,
-      isVideo: true,
-    });
-
-    await existingCourse.save();
   }
-
-  // Video data (soft delete)
-  video.isDeleted = true;
-  video.deletedAt = Date.now();
-  video.course = null;
-  video.module = null;
-  video.subModule = null;
-  await video.save();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -357,34 +389,51 @@ exports.updateActiveStatus = async (req, res, next) => {
     throw new BadRequestError("Video status is already " + isActive);
   }
 
-  const existingCourse = await courseModel.findById(video.course);
-  const existingVideos = getSubModuleVideos({
-    modules: existingCourse.modules,
-    module: video.module,
-    subModule: video.subModule,
-  });
-
-  const videoEntry = existingVideos.find((v) => v.videoId.equals(video._id));
-  if (!videoEntry) {
-    throw new BadRequestError("Video doesn't exists in submodule");
-  }
-
   if (isActive === false) {
-    courseModel.removeItemSequence({
-      arr: existingVideos,
-      toRemoveItem: videoEntry,
-      isVideo: true,
-      makeInactive: true,
-    });
+    const session = await mongoose.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        // Update sequences in old location
+        const query = {};
+        if (video.submodule) {
+          query.submodule = video.submodule;
+        } else if (video.course) {
+          query.course = video.course;
+          query.submodule = null;
+        }
+
+        await VideoModel.updateMany(
+          {
+            ...query,
+            sequence: { $gt: video.sequence },
+          },
+          { $inc: { sequence: -1 } },
+          { session }
+        );
+
+        // Update video with new location and sequence
+
+        video.sequence = -1;
+        video.isActive = false;
+
+        await video.save({ session });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
+    }
   } else {
-    const latestSequence = courseModel.getLatestSequenceNumber(existingVideos);
-    videoEntry.sequence = latestSequence + 1;
+    const newSequence = await VideoModel.getNextSequence({
+      course: video.course,
+      submodule: video.submodule,
+    });
+    video.sequence = newSequence;
+    video.isActive = true;
+    await video.save();
   }
-
-  await existingCourse.save();
-
-  video.isActive = isActive;
-  await video.save();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -432,8 +481,8 @@ exports.deleteAllVideos = async (req, res, next) => {
 
     for (const course of existingCourses) {
       for (const module of course.modules || []) {
-        for (const subModule of module.subModules || []) {
-          subModule.videos = []; // Clear videos in subModules
+        for (const submodule of module.submodules || []) {
+          submodule.videos = []; // Clear videos in submodules
         }
       }
       course.freeVideos = []; // Clear freeVideos for the course

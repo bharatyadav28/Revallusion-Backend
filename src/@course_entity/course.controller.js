@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 
 const courseModel = require("./course.model.js");
@@ -49,11 +50,78 @@ exports.getCoursesNames = async (req, res) => {
 
 // Get a single course
 exports.getCourse = async (req, res) => {
-  const course = await courseModel
-    .findById(req.params.id)
-    .populate("modules.subModules.videos.videoId")
-    .populate("freeVideos.videoId")
-    .lean();
+  const [course] = await courseModel.aggregate([
+    {
+      $match: {
+        _id: StringToObjectId(req.params.id),
+      },
+    },
+    {
+      $lookup: {
+        from: "coursemodules",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          // Nested lookup to get submodules for each module
+          { $project: { _id: 1, name: 1 } },
+          {
+            $lookup: {
+              from: "submodules",
+              localField: "_id",
+              foreignField: "module",
+              pipeline: [
+                // Sort submodules by sequence
+                { $sort: { sequence: 1 } },
+                // Nested lookup to get videos for each submodule
+                { $project: { _id: 1, name: 1, sequence: 1, thumbnailUrl: 1 } },
+                {
+                  $lookup: {
+                    from: "videos",
+                    localField: "_id",
+                    foreignField: "submodule",
+                    pipeline: [
+                      // Only get active and non-deleted videos
+                      {
+                        $match: {
+                          isDeleted: false,
+                        },
+                      },
+                      // Sort videos by sequence
+                      { $sort: { sequence: 1 } },
+                    ],
+                    as: "videos",
+                  },
+                },
+              ],
+              as: "submodules",
+            },
+          },
+        ],
+        as: "modules",
+      },
+    },
+    // Optional: Lookup for free videos directly associated with course
+    {
+      $lookup: {
+        from: "videos",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          {
+            $match: {
+              isActive: true,
+              isDeleted: false,
+              submodule: null, // Only get videos directly linked to course
+            },
+          },
+          { $sort: { sequence: 1 } },
+        ],
+        as: "freeVideos",
+      },
+    },
+    { $limit: 1 },
+  ]);
+
   if (!course) {
     throw new NotFoundError("Course not found");
   }
@@ -79,236 +147,82 @@ exports.updateCourse = async (req, res) => {
   });
 };
 
-// Add a submodule
-exports.addSubModule = async (req, res) => {
-  const { courseId, moduleId, name, thumbnailUrl } = req.body;
-
-  if (!name) throw new BadRequestError("Please enter submodule name");
-
-  const course = await courseModel.findOne({
-    _id: courseId,
-  });
-  if (!course) throw new NotFoundError("Requested course may not exists");
-
-  const module = course.modules.id(moduleId);
-  if (!module) throw new NotFoundError("Requested module may not exists");
-
-  const subModules = module.subModules;
-
-  const latestSequence = courseModel.getLatestSequenceNumber(subModules);
-
-  const newSubModule = { name, sequence: latestSequence + 1, thumbnailUrl };
-  module.subModules.push(newSubModule);
-  await course.save();
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Submodule added successfully",
-  });
-};
-
-// Update a submodule present in a module
-exports.updateSubModule = async (req, res) => {
-  let { courseId, moduleId, name, thumbnailUrl, newModuleId, sequence } =
-    req.body;
-  if (!name) throw new BadRequestError("Please enter submodule name");
-
-  const { id: subModuleId } = req.params;
-
-  const course = await courseModel.findOne({
-    _id: courseId,
-  });
-  if (!course) throw new NotFoundError("Requested course may not exists");
-
-  const module = course.modules.id(moduleId);
-  if (!module) throw new NotFoundError("Requested module may not exists");
-
-  const subModule = module.subModules.id(subModuleId);
-  if (!subModule) throw new NotFoundError("Requested submodule may not exists");
-
-  if (name) subModule.name = name;
-  if (thumbnailUrl) subModule.thumbnailUrl = thumbnailUrl;
-
-  const currentSequence = subModule.sequence;
-
-  if (newModuleId) {
-    // Case 1: Module changed (Submodule is moved to another module)
-
-    // 1. Add submodule to new module
-    const targetModule = course.modules.id(newModuleId);
-    if (!targetModule) {
-      throw new NotFoundError("The target module doesn't exist");
-    }
-
-    // Find greatest sequence number of  submodules in target module
-    const targetSubModules = targetModule.subModules;
-    const latestSequence =
-      courseModel.getLatestSequenceNumber(targetSubModules);
-
-    if (!sequence || sequence <= 0 || sequence > latestSequence) {
-      sequence = latestSequence + 1;
-    } else {
-      // If submodule is inserted at a specific sequence(other than last), increment required submodule sequences
-      targetSubModules.forEach((subMod) => {
-        if (subMod.sequence >= sequence) {
-          subMod.sequence += 1;
-        }
-      });
-    }
-
-    const newSubModule = {
-      ...subModule.toObject(),
-      sequence,
-    };
-    targetSubModules.push(newSubModule);
-
-    //2. Remove submodule from previous module
-    courseModel.removeItemSequence({
-      arr: module.subModules,
-      toRemoveItem: subModule,
-    });
-
-    // 3. Update submodule id in video model for each video in that module
-    const videosUpdatePromises = subModule.videos.map(async (video) => {
-      const updatedVideo = VideoModel.findByIdAndUpdate(
-        video.videoId,
-        {
-          module: newModuleId,
-        },
-        {
-          new: true,
-          runValidators: true,
-        }
-      );
-      return updatedVideo;
-    });
-
-    const results = await Promise.all(videosUpdatePromises);
-
-    // Check for errors in the results
-    const errors = results.filter((result) => result && result?.error);
-
-    if (errors.length > 0) {
-      throw new BadRequestError(
-        "Error in submodule id in video model:",
-        errors
-      );
-    }
-  } else if (sequence && sequence !== currentSequence) {
-    // Case 2:  Submodule sequence changed
-
-    if (sequence < 0) {
-      throw new BadRequestError("Negative sequence number not allowed");
-    }
-
-    const latestSequence = courseModel.getLatestSequenceNumber(
-      module.subModules
-    );
-
-    if (sequence > latestSequence) sequence = latestSequence;
-
-    if (sequence < currentSequence) {
-      // If new sequence is less than current sequence, increment required submodule sequences
-      module.subModules.forEach((subMod) => {
-        if (subMod.sequence >= sequence && subMod.sequence < currentSequence) {
-          subMod.sequence += 1;
-        }
-      });
-    } else {
-      // If new sequence is greater than current sequence, decrement required submodule sequences
-      module.subModules.forEach((subMod) => {
-        if (subMod.sequence <= sequence && subMod.sequence > currentSequence) {
-          subMod.sequence -= 1;
-        }
-      });
-    }
-
-    // Assign this sequence to this item
-    subModule.sequence = sequence;
-  }
-
-  await course.save();
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Submodule updated successfully",
-    course: course,
-    subModule: subModule,
-  });
-};
-
 exports.updateVideoSequence = async (req, res) => {
-  let { courseId, moduleId, subModuleId, sequence } = req.body;
-
-  if (!courseId) {
-    throw new BadRequestError("Please enter courseid, moduleId and sourceId");
-  }
-
+  let { courseId, moduleId, submoduleId, sequence } = req.body;
   const videoId = req.params.id;
 
-  const course = await courseModel.findOne({
-    _id: courseId,
-  });
-  if (!course) throw new NotFoundError("Requested course may not exists");
+  let query = {
+    _id: StringToObjectId(videoId),
+  };
+  if (courseId) query.course = StringToObjectId(courseId);
+  if (moduleId) query.module = StringToObjectId(moduleId);
+  if (submoduleId) query.submodule = StringToObjectId(submoduleId);
 
-  if (sequence < 0) {
-    throw new BadRequestError("Negative sequence number not allowed");
-  }
+  const video = await VideoModel.findOne(query);
+  if (!video) throw new NotFoundError("Requested video may not exists");
 
-  let videos = course.freeVideos;
+  if (video.sequence !== sequence) {
+    // Validate sequence number
+    if (sequence < 1) sequence = 1;
 
-  if (!course.isFree) {
-    if (!moduleId || !subModuleId) {
-      throw new BadRequestError("Please enter moduleId and sourceId");
+    // Sequence  number must not exceeds limit
+    const newSequenceLimit = await VideoModel.getNextSequence({
+      course: courseId,
+      submodule: submoduleId,
+    });
+
+    if (sequence >= newSequenceLimit) sequence = newSequenceLimit - 1;
+
+    const query = {};
+    if (video.submodule) {
+      query.submodule = video.submodule;
+    } else if (video.course) {
+      query.course = video.course;
+      query.submodule = null;
     }
 
-    const module = course.modules.id(moduleId);
-    if (!module) throw new NotFoundError("Requested module may not exists");
+    // Start a session
+    const session = await mongoose.startSession();
 
-    const subModule = module.subModules.id(subModuleId);
-    if (!subModule)
-      throw new NotFoundError("Requested submodule may not exists");
+    try {
+      // Perform multiple operation, one fail then roll back
 
-    videos = subModule.videos;
+      await session.withTransaction(async () => {
+        const oldSequence = video.sequence;
+
+        if (sequence > oldSequence) {
+          // 2. Moving down: decrease sequence of items in between
+          await VideoModel.updateMany(
+            {
+              ...query,
+              sequence: { $gt: oldSequence, $lte: sequence },
+            },
+            { $inc: { sequence: -1 } },
+            { session }
+          );
+        } else if (sequence < oldSequence) {
+          //3.  Moving up: increase sequence of items in between
+          const r = await VideoModel.updateMany(
+            {
+              ...query,
+              sequence: { $gte: sequence, $lt: oldSequence },
+            },
+            { $inc: { sequence: 1 } },
+            { session }
+          );
+        }
+
+        // Update the submodule's sequence
+        video.sequence = sequence;
+        await video.save({ session });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
+    }
   }
-
-  const existingVideo = videos.find((video) => video.videoId.equals(videoId));
-  if (!existingVideo) {
-    throw new BadRequestError("Video doesn't exists in submodule");
-  }
-
-  const currentSequence = existingVideo.sequence;
-  const latestSequence = courseModel.getLatestSequenceNumber(videos);
-
-  sequence = updateSequence({
-    arr: videos,
-    currentSequence,
-    latestSequence,
-    newSequence: sequence,
-  });
-
-  // if (sequence > latestSequence) sequence = latestSequence;
-
-  // if (sequence < currentSequence) {
-  //   // If new sequence is less than current sequence, increment required videos sequences
-  //   videos.forEach((video) => {
-  //     if (video.sequence >= sequence && video.sequence < currentSequence) {
-  //       video.sequence += 1;
-  //     }
-  //   });
-  // } else {
-  //   // If new sequence is greater than current sequence, decrement required submodule sequences
-  //   videos.forEach((video) => {
-  //     if (video.sequence <= sequence && video.sequence > currentSequence) {
-  //       video.sequence -= 1;
-  //     }
-  //   });
-  // }
-
-  // Assign this sequence to this item
-  existingVideo.sequence = sequence;
-
-  await course.save();
 
   res.status(StatusCodes.OK).json({
     success: true,

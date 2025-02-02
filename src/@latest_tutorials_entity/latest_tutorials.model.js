@@ -1,8 +1,8 @@
 const mongoose = require("mongoose");
 
-const LatestVideoSchema = new mongoose.Schema(
+const LatestTutorialsSchema = new mongoose.Schema(
   {
-    videoId: {
+    video: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Video",
       required: [true, "Please provide video id"],
@@ -10,22 +10,26 @@ const LatestVideoSchema = new mongoose.Schema(
     sequence: {
       type: Number,
       required: [true, "Please enter video sequence"],
-      unique: [true, "Video sequence should be unique"],
     },
-  },
-  { _id: false }
-);
-
-const LatestTutorailsSchema = new mongoose.Schema(
-  {
-    videos: [LatestVideoSchema],
   },
   { timestamps: true }
 );
+LatestTutorialsSchema.index({ sequence: 1 });
+
+// Get next sequence number in the list
+LatestTutorialsSchema.statics.getNextSequence = async function () {
+  const maxSequence = await this.findOne(
+    {},
+    { sequence: 1 },
+    { sort: { sequence: -1 } }
+  );
+
+  return (maxSequence?.sequence || 0) + 1;
+};
 
 const LatestTutorailsModel = mongoose.model(
-  "LatestTutorails",
-  LatestTutorailsSchema
+  "LatestTutorials",
+  LatestTutorialsSchema
 );
 
 module.exports = LatestTutorailsModel;

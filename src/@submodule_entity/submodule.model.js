@@ -17,7 +17,7 @@ const SubmoduleSchema = new mongoose.Schema({
     required: [true, "Please enter sub-module sequence"],
   },
 });
-SubmoduleSchema.index({ module: 1, sequence: 1 }, { unique: true });
+SubmoduleSchema.index({ module: 1, sequence: 1 });
 
 // Static methods
 

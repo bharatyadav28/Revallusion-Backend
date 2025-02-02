@@ -38,7 +38,6 @@ exports.createOrder = async (req, res) => {
     select: "plan_type validity inr_price",
   });
 
-  console.log("Active order: ", activeOrder);
   // Check if user already has an active order
   if (activeOrder) {
     const today = Date.now();
@@ -71,7 +70,6 @@ exports.createOrder = async (req, res) => {
       );
 
       remainingAmount = activeRemainingDays * activePerDayAmount;
-      console.log("Remaining amount: ", remainingAmount);
     }
   }
 

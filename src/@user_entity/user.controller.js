@@ -36,16 +36,16 @@ const { appendBucketName } = require("../../utils/helperFuns.js");
 exports.getHomeContent = async (req, res, next) => {
   // Queries
   const heroSection = HeroSectionModel.findOne();
-  const carousal = CarousalModel.findOne()
+  const carousal = CarousalModel.find()
     .populate({
-      path: "videos.videoId",
+      path: "video",
       select: "title description thumbnailUrl videoUrl",
     })
     .lean();
 
-  const latestTutorials = LatestTutorialsModel.findOne()
+  const latestTutorials = LatestTutorialsModel.find()
     .populate({
-      path: "videos.videoId",
+      path: "video",
       select: "title description thumbnailUrl videoUrl",
     })
     .lean();
@@ -86,9 +86,9 @@ exports.getHomeContent = async (req, res, next) => {
         return {
           sequence: item.sequence,
           video: {
-            ...item.videoId,
-            thumbnailUrl: appendBucketName(item.videoId.thumbnailUrl),
-            videoUrl: appendBucketName(item.videoId.videoUrl),
+            ...item.video,
+            thumbnailUrl: appendBucketName(item.video.thumbnailUrl),
+            videoUrl: appendBucketName(item.video.videoUrl),
           },
         };
       });
@@ -109,8 +109,8 @@ exports.getHomeContent = async (req, res, next) => {
     success: true,
     data: {
       heroSection: data[0],
-      carousal: generateFullURLs(data[1]?.videos),
-      latestTutorials: generateFullURLs(data[2]?.videos),
+      carousal: generateFullURLs(data[1]),
+      latestTutorials: generateFullURLs(data[2]),
       modules: data[3],
       plans: data[4],
       mentors: data[5],

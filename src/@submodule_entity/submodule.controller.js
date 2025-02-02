@@ -20,14 +20,14 @@ exports.addSubModule = async (req, res) => {
   const sequence = await SubmoduleModel.getNextSequence(moduleId);
 
   // Add the submodule
-  const subModule = await SubmoduleModel.create({
+  const submodule = await SubmoduleModel.create({
     module: moduleId,
     name,
     sequence,
     thumbnailUrl,
   });
 
-  if (!subModule) {
+  if (!submodule) {
     throw new BadRequestError("Failed to add submodule");
   }
 
@@ -42,12 +42,12 @@ exports.updateSubModule = async (req, res) => {
   let { name, thumbnailUrl, newModuleId, sequence } = req.body;
   if (!name) throw new BadRequestError("Please enter submodule name");
 
-  const { id: subModuleId } = req.params;
+  const { id: submoduleId } = req.params;
 
   // const module = course.modules.id(moduleId);
   // if (!module) throw new NotFoundError("Requested module may not exists");
 
-  const submodule = await SubmoduleModel.findById(subModuleId);
+  const submodule = await SubmoduleModel.findById(submoduleId);
   if (!submodule) throw new NotFoundError("Requested submodule may not exists");
 
   if (name) submodule.name = name;
@@ -95,6 +95,16 @@ exports.updateSubModule = async (req, res) => {
         submodule.module = newModuleId;
         submodule.sequence = newSequence;
         await submodule.save({ session });
+
+        // update module id in corresponding video ;
+        await mongoose.model("Video").updateMany(
+          {
+            module: oldModuleId,
+            submodule: submodule._id,
+          },
+          { $set: { module: newModuleId } },
+          { session }
+        );
       });
 
       await session.endSession();
@@ -104,7 +114,7 @@ exports.updateSubModule = async (req, res) => {
     }
 
     //TODO: 3. Update submodule id in video model for each video in that module
-    // const videosUpdatePromises = subModule.videos.map(async (video) => {
+    // const videosUpdatePromises = submodule.videos.map(async (video) => {
     //   const updatedVideo = VideoModel.findByIdAndUpdate(
     //     video.videoId,
     //     {
@@ -186,6 +196,6 @@ exports.updateSubModule = async (req, res) => {
     success: true,
     message: "Submodule updated successfully",
 
-    subModule: submodule,
+    submodule: submodule,
   });
 };

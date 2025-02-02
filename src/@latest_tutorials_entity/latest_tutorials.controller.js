@@ -1,5 +1,6 @@
+const mongoose = require("mongoose");
+
 const LatestTutorailsModel = require("./latest_tutorials.model.js");
-const CourseModel = require("../@course_entity/course.model.js");
 const { BadRequestError } = require("../../errors/index.js");
 const { StatusCodes } = require("http-status-codes");
 const {
@@ -9,9 +10,9 @@ const {
 
 // Get all latest tutorials
 exports.getAllLatestTutorials = async (req, res) => {
-  const tutorials = await LatestTutorailsModel.findOne().populate(
-    "videos.videoId"
-  );
+  const tutorials = await LatestTutorailsModel.find()
+    .populate({ path: "video", select: "title description" })
+    .lean();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -24,30 +25,18 @@ exports.getAllLatestTutorials = async (req, res) => {
 exports.addVideosToTutorials = async (req, res) => {
   const { videos: newVideos } = req.body;
 
-  // Video array is empty
-  if (newVideos.length == 0) {
+  if (newVideos.length === 0) {
     throw new BadRequestError("Please enter videos");
   }
 
-  let tutorial = await LatestTutorailsModel.findOne();
-  if (!tutorial) {
-    tutorial = await LatestTutorailsModel.create({ videos: [] });
+  const nextSequence = Number(await LatestTutorailsModel.getNextSequence()) - 1;
 
-    if (!tutorial) {
-      throw new BadRequestError("Somehting went wrong in creating tutorials");
-    }
-  }
+  const newTutorials = newVideos.map((video, index) => ({
+    sequence: nextSequence + index + 1,
+    video: video.videoId,
+  }));
 
-  const tutorialVideos = tutorial.videos;
-  const latestSequence = CourseModel.getLatestSequenceNumber(tutorialVideos);
-
-  for (let i = 0; i < newVideos.length; i++) {
-    newVideos[i].sequence = latestSequence + i + 1;
-  }
-
-  tutorial.videos = [...tutorialVideos, ...newVideos];
-
-  await tutorial.save();
+  await LatestTutorailsModel.insertMany(newTutorials);
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -57,35 +46,70 @@ exports.addVideosToTutorials = async (req, res) => {
 
 // Update video sequence
 exports.updateTutorialVideoSequence = async (req, res) => {
-  const { id: videoId } = req.params;
+  const { id } = req.params;
   let { sequence } = req.body;
 
-  const tutorial = await LatestTutorailsModel.findOne();
+  const tutorial = await LatestTutorailsModel.findById(id);
   if (!tutorial) {
-    throw new BadRequestError("No tutorial array exists");
+    throw new NotFoundError("Tutorial not found");
   }
 
-  const tutorialVideos = tutorial.videos;
-  const existingVideo = tutorialVideos.find((v) =>
-    v.videoId.equals(StringToObjectId(videoId))
-  );
-  if (!existingVideo) {
-    throw new BadRequestError("Video doesn't exists in the tutorial");
+  if (sequence !== tutorial.sequence) {
+    // Validate sequence number
+    if (sequence < 1) sequence = 1;
+
+    // Sequence  number must not exceeds limit
+    const newSequenceLimit = await LatestTutorailsModel.getNextSequence();
+
+    if (sequence >= newSequenceLimit) sequence = newSequenceLimit - 1;
+
+    // Start a session
+    const session = await mongoose.startSession();
+
+    try {
+      // Perform multiple operation, one fail then roll back
+
+      await session.withTransaction(async () => {
+        const oldSequence = tutorial.sequence;
+
+        // 1. Temporarily mark the moving submodule
+        await LatestTutorailsModel.updateOne(
+          { _id: tutorial._id },
+          { $set: { sequence: -1 } }, // Temporary marker
+          { session }
+        );
+
+        if (sequence > oldSequence) {
+          // 2. Moving down: decrease sequence of items in between
+          await LatestTutorailsModel.updateMany(
+            {
+              sequence: { $gt: oldSequence, $lte: sequence },
+            },
+            { $inc: { sequence: -1 } },
+            { session }
+          );
+        } else if (sequence < oldSequence) {
+          //3.  Moving up: increase sequence of items in between
+          const r = await LatestTutorailsModel.updateMany(
+            {
+              sequence: { $gte: sequence, $lt: oldSequence },
+            },
+            { $inc: { sequence: 1 } },
+            { session }
+          );
+        }
+
+        // Update the submodule's sequence
+        tutorial.sequence = sequence;
+        await tutorial.save({ session });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
+    }
   }
-
-  const currentSequence = existingVideo.sequence;
-  const latestSequence = CourseModel.getLatestSequenceNumber(tutorialVideos);
-
-  sequence = updateSequence({
-    arr: tutorialVideos,
-    currentSequence,
-    latestSequence,
-    newSequence: sequence,
-  });
-
-  existingVideo.sequence = sequence;
-
-  await tutorial.save();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -95,29 +119,37 @@ exports.updateTutorialVideoSequence = async (req, res) => {
 
 // Remove video from tutorial
 exports.deleteVideosFromTutorials = async (req, res) => {
-  const { id: videoId } = req.params;
+  const { id } = req.params;
 
-  const tutorial = await LatestTutorailsModel.findOne();
+  const tutorial = await LatestTutorailsModel.findById(id);
   if (!tutorial) {
-    throw new BadRequestError("No tutorial array exists");
+    throw new NotFoundError("Tutorial not found");
   }
 
-  const existingVideos = tutorial.videos;
+  const sequence = tutorial.sequence;
 
-  const videoEntry = existingVideos.find((v) =>
-    v.videoId.equals(StringToObjectId(videoId))
-  );
-  if (!videoEntry) {
-    throw new BadRequestError("Video doesn't exists in the tutorial");
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const deletedTutorial = await LatestTutorailsModel.findByIdAndDelete(id, {
+        session,
+      });
+
+      if (!deletedTutorial) {
+        throw new Error("Tutorial not found or already deleted");
+      }
+
+      await LatestTutorailsModel.updateMany(
+        { sequence: { $gt: sequence } },
+        { $inc: { sequence: -1 } },
+        { session }
+      );
+    });
+  } catch (error) {
+    await session.endSession();
+    throw error;
   }
-
-  CourseModel.removeItemSequence({
-    arr: existingVideos,
-    toRemoveItem: videoEntry,
-    isVideo: true,
-  });
-
-  await tutorial.save();
 
   res.status(StatusCodes.OK).json({
     success: true,

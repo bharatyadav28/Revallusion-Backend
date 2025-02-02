@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 
 const CarousalModel = require("./carousal.model.js");
@@ -12,29 +13,18 @@ const {
 exports.addCarousalData = async (req, res) => {
   const { videos: newVideos } = req.body;
 
-  if (newVideos.length == 0) {
+  if (newVideos.length === 0) {
     throw new BadRequestError("Please enter videos");
   }
 
-  let carousals = await CarousalModel.findOne();
-  if (!carousals) {
-    carousals = await CarousalModel.create({ videos: [] });
+  const nextSequence = Number(await CarousalModel.getNextSequence()) - 1;
 
-    if (!carousals) {
-      throw new BadRequestError("Something went wrong in creating carousals");
-    }
-  }
+  const newCarousals = newVideos.map((video, index) => ({
+    sequence: nextSequence + index + 1,
+    video: video.videoId,
+  }));
 
-  const carousalsVideos = carousals.videos;
-  const latestSequence = CourseModel.getLatestSequenceNumber(carousalsVideos);
-
-  for (let i = 0; i < newVideos.length; i++) {
-    newVideos[i].sequence = latestSequence + i + 1;
-  }
-
-  carousals.videos = [...carousalsVideos, ...newVideos];
-
-  await carousals.save();
+  await CarousalModel.insertMany(newCarousals);
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -44,7 +34,10 @@ exports.addCarousalData = async (req, res) => {
 
 // Get all carousals
 exports.getCarousals = async (req, res) => {
-  const carousals = await CarousalModel.findOne().populate("videos.videoId");
+  const carousals = await CarousalModel.find()
+    .sort({ sequence: 1 })
+    .populate({ path: "video", select: "title description" })
+    .lean();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -55,36 +48,70 @@ exports.getCarousals = async (req, res) => {
 
 // Update a carousal
 exports.updateCarousal = async (req, res) => {
-  const { id: videoId } = req.params;
+  const { id } = req.params;
   let { sequence } = req.body;
 
-  const carousals = await CarousalModel.findOne();
-  if (!carousals) {
-    throw new BadRequestError("No carosual array exists");
+  const carousal = await CarousalModel.findById(id);
+  if (!carousal) {
+    throw new NotFoundError("Carousal not found");
   }
 
-  const carousalsVideos = carousals.videos;
+  if (sequence !== carousal.sequence) {
+    // Validate sequence number
+    if (sequence < 1) sequence = 1;
 
-  const existingVideo = carousalsVideos.find((v) =>
-    v.videoId.equals(StringToObjectId(videoId))
-  );
-  if (!existingVideo) {
-    throw new BadRequestError("Video doesn't exists in the tutorial");
+    // Sequence  number must not exceeds limit
+    const newSequenceLimit = await CarousalModel.getNextSequence();
+
+    if (sequence >= newSequenceLimit) sequence = newSequenceLimit - 1;
+
+    // Start a session
+    const session = await mongoose.startSession();
+
+    try {
+      // Perform multiple operation, one fail then roll back
+
+      await session.withTransaction(async () => {
+        const oldSequence = carousal.sequence;
+
+        // 1. Temporarily mark the moving submodule
+        await CarousalModel.updateOne(
+          { _id: carousal._id },
+          { $set: { sequence: -1 } }, // Temporary marker
+          { session }
+        );
+
+        if (sequence > oldSequence) {
+          // 2. Moving down: decrease sequence of items in between
+          await CarousalModel.updateMany(
+            {
+              sequence: { $gt: oldSequence, $lte: sequence },
+            },
+            { $inc: { sequence: -1 } },
+            { session }
+          );
+        } else if (sequence < oldSequence) {
+          //3.  Moving up: increase sequence of items in between
+          const r = await CarousalModel.updateMany(
+            {
+              sequence: { $gte: sequence, $lt: oldSequence },
+            },
+            { $inc: { sequence: 1 } },
+            { session }
+          );
+        }
+
+        // Update the submodule's sequence
+        carousal.sequence = sequence;
+        await carousal.save({ session });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
+    }
   }
-
-  const currentSequence = existingVideo.sequence;
-  const latestSequence = CourseModel.getLatestSequenceNumber(carousalsVideos);
-
-  sequence = updateSequence({
-    arr: carousalsVideos,
-    currentSequence,
-    latestSequence,
-    newSequence: sequence,
-  });
-
-  existingVideo.sequence = sequence;
-
-  await carousals.save();
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -94,28 +121,37 @@ exports.updateCarousal = async (req, res) => {
 
 // Delete a carousal
 exports.deleteCarousal = async (req, res) => {
-  const { id: videoId } = req.params;
+  const { id } = req.params;
 
-  const carousals = await CarousalModel.findOne();
-  if (!carousals) {
-    throw new BadRequestError("No carosual array exists");
+  const carousal = await CarousalModel.findById(id);
+  if (!carousal) {
+    throw new NotFoundError("Carousal not found");
   }
 
-  const existingVideos = carousals.videos;
-  const videoEntry = existingVideos.find((v) =>
-    v.videoId.equals(StringToObjectId(videoId))
-  );
-  if (!videoEntry) {
-    throw new BadRequestError("carousal doesn't exist");
+  const sequence = carousal.sequence;
+
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const deletedCarousal = await CarousalModel.findByIdAndDelete(id, {
+        session,
+      });
+
+      if (!deletedCarousal) {
+        throw new Error("Carousal not found or already deleted");
+      }
+
+      await CarousalModel.updateMany(
+        { sequence: { $gt: sequence } },
+        { $inc: { sequence: -1 } },
+        { session }
+      );
+    });
+  } catch (error) {
+    await session.endSession();
+    throw error;
   }
-
-  CourseModel.removeItemSequence({
-    arr: existingVideos,
-    toRemoveItem: videoEntry,
-    isVideo: true,
-  });
-
-  await carousals.save();
 
   res.status(StatusCodes.OK).json({
     success: true,
