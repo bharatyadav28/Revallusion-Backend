@@ -220,13 +220,15 @@ exports.updateVideo = async (req, res, next) => {
 
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
 
-  let isIntroductory = false;
-
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
     !video?.course?.equals(StringToObjectId(course)) ||
     video.module !== (module || null) ||
     video.submodule !== (submodule || null);
+
+  if (title) video.title = title;
+  if (description) video.description = description;
+  if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists
@@ -294,22 +296,9 @@ exports.updateVideo = async (req, res, next) => {
       await session.endSession();
       throw error;
     }
-
-    return res.status(StatusCodes.OK).json({
-      success: true,
-      message: "Video updated successfully",
-    });
+  } else {
+    await video.save();
   }
-
-  // Save video(Model)
-  if (title) video.title = title;
-  if (description) video.description = description;
-  if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
-  video.course = course || null;
-  video.module = isIntroductory || !course || !module ? null : module;
-  video.submodule = isIntroductory || !course || !submodule ? null : submodule;
-
-  await video.save();
 
   res.status(StatusCodes.OK).json({
     success: true,

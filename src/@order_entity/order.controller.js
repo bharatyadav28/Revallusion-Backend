@@ -8,12 +8,16 @@ const UserModel = require("../@user_entity/user.model");
 const PlanModel = require("../@plan_entity/plan.model");
 const TransactionModel = require("../@transaction_entity/transaction.model");
 const OrderModel = require("./order.model");
-const { StringToObjectId } = require("../../utils/helperFuns");
+const {
+  StringToObjectId,
+  getFrontendDomain,
+} = require("../../utils/helperFuns");
+const { default: mongoose } = require("mongoose");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
   const { plan } = req.body;
-  const userId = req?.user?._id || "6776754159ca30b48917b457";
+  const userId = req?.user?._id || "67a04e77e4b4f62057ba7a8d";
 
   const user = await UserModel.findById(userId);
   if (!user)
@@ -23,22 +27,22 @@ exports.createOrder = async (req, res) => {
     throw new BadRequestError("Please provide a plan id");
   }
 
-  // check if plan is valid
+  // Check if plan is valid
   const existingPlan = await PlanModel.findById(plan);
   if (!existingPlan) throw new NotFoundError("Plan not found");
 
   let expiry_date = new Date();
   let remainingAmount = 0;
 
+  // Check if user already has an active order
   const activeOrder = await OrderModel.findOne({
     user: StringToObjectId(userId),
-    // status: "Active",
+    status: "Active",
   }).populate({
     path: "plan",
     select: "plan_type validity inr_price",
   });
 
-  // Check if user already has an active order
   if (activeOrder) {
     const today = Date.now();
 
@@ -64,11 +68,11 @@ exports.createOrder = async (req, res) => {
         (activeOrder.expiry_date - today) / (1000 * 60 * 60 * 24)
       );
 
+      // Active plan price validity
       const activeValidity = activeOrder.plan.validity / (60 * 60 * 24);
-      const activePerDayAmount = Math.floor(
-        activeOrder.plan.inr_price / activeValidity
-      );
 
+      // Active plan per day amount
+      const activePerDayAmount = activeOrder.plan.inr_price / activeValidity;
       remainingAmount = activeRemainingDays * activePerDayAmount;
     }
   }
@@ -76,10 +80,9 @@ exports.createOrder = async (req, res) => {
   // New order validity
   const validityInDays = existingPlan.validity / (60 * 60 * 24);
   expiry_date.setDate(expiry_date.getDate() + validityInDays);
-  console.log("Expire date: ", expiry_date);
 
   // Amount in Rupees
-  const amount = existingPlan.inr_price - remainingAmount;
+  const amount = Math.floor(existingPlan.inr_price - remainingAmount);
   const paise = Number(amount) * 100;
 
   // Razorpay order
@@ -98,7 +101,7 @@ exports.createOrder = async (req, res) => {
     inr_price: amount,
     expiry_date,
     status: "Pending",
-    actual_price: amount,
+    actual_price: existingPlan.inr_price,
   };
 
   const savedOrder = await OrderModel.create(query);
@@ -137,8 +140,6 @@ exports.verifyPayment = async (req, res) => {
     .update(body.toString())
     .digest("hex");
 
-  console.log("Signatures", razorpay_signature, generatedSignature);
-
   const isAuthentic = generatedSignature === razorpay_signature;
 
   const order = await OrderModel.findOne({ order_id: razorpay_order_id });
@@ -155,6 +156,7 @@ exports.verifyPayment = async (req, res) => {
     status: "Pending",
   });
 
+  // Check if payment is authentic
   if (!isAuthentic) {
     transaction.status = "Failed";
     const saveTransaction = transaction.save();
@@ -168,16 +170,39 @@ exports.verifyPayment = async (req, res) => {
     });
   }
 
-  transaction.status = "Completed";
-  const saveTransaction = transaction.save();
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  order.status = "Active";
-  order.razorpay_signature = razorpay_signature;
-  const saveOrder = order.save();
+  try {
+    // Expire previous active order
+    await OrderModel.findOneAndUpdate(
+      { user: order.user, status: "Active" },
+      { $set: { status: "Expire" } },
+      { new: true, runValidators: true, session }
+    );
 
-  await Promise.all([saveTransaction, saveOrder]);
+    // Make current transaction comolete
+    transaction.status = "Completed";
+    const saveTransaction = transaction.save({ session });
 
-  //   res.redirect("")
+    // Make current order active
+    order.status = "Active";
+    order.razorpay_signature = razorpay_signature;
+    const saveOrder = order.save({ session });
+
+    await Promise.all([saveTransaction, saveOrder]);
+
+    // Commit the transaction
+    await session.commitTransaction();
+    session.endSession();
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+
+  const frontendDomain = getFrontendDomain(req);
+  res.redirect(`${frontendDomain}/verify-payment`);
 
   return res.status(StatusCodes.OK).json({
     success: true,

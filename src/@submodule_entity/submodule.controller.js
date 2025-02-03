@@ -190,6 +190,8 @@ exports.updateSubModule = async (req, res) => {
       await session.endSession();
       throw error;
     }
+  } else {
+    await submodule.save();
   }
 
   res.status(StatusCodes.OK).json({

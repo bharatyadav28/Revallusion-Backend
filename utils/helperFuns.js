@@ -113,3 +113,16 @@ exports.updateSequence = ({
 
   return sequence;
 };
+
+exports.getFrontendDomain = (req) => {
+  const host = req.get("host"); // Get the domain or host from the request
+
+  let domain = "";
+  if (host.includes("localhost") || host.includes("127.0.0.1")) {
+    domain = "http://localhost:3000"; // Local development URL
+  } else {
+    domain = `https://${host}`; // Production URL, which uses the current domain
+  }
+
+  return domain;
+};
