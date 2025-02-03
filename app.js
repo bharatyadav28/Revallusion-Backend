@@ -59,6 +59,7 @@ const courseRouter = require("./src/@course_entity/course.index");
 const courseModuleRouter = require("./src/@course_module_entity/course_module.index");
 const submoduleRouter = require("./src/@submodule_entity/submodule.index");
 const orderRouter = require("./src/@order_entity/order.index");
+const assignmentRouter = require("./src/@assignment_entity/assignment.index");
 
 // Paths
 // Landing page static paths
@@ -82,6 +83,7 @@ app.use("/api/v1/course/submodule", submoduleRouter);
 app.use("/api/v1/course", courseRouter);
 
 app.use("/api/v1/order", orderRouter);
+app.use("/api/v1/assignment", assignmentRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

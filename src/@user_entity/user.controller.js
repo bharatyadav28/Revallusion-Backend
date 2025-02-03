@@ -140,14 +140,11 @@ exports.sendMe = async (req, res) => {
 
 // Signin and Signup
 exports.signin = async (req, res) => {
-  const { email, password } = req.body;
+  const { email } = req.body;
 
   // Check required fields
   if (!email) {
     throw new BadRequestError("Please enter email");
-  }
-  if (!password) {
-    throw new BadRequestError("Please enter password");
   }
 
   let query = { email: email, isDeleted: false };
@@ -158,10 +155,10 @@ exports.signin = async (req, res) => {
   // Signup
   if (!user || !isVerified) {
     if (!user) {
-      user = await userModel.create({ email, password });
+      user = await userModel.create({ email });
     } else {
       user.email = email;
-      user.password = password;
+      // user.password = password;
       await user.save();
     }
 
