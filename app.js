@@ -21,7 +21,13 @@ exports.instance = new Razorpay({
 app.use(express.json());
 app.use(
   cors({
-    origin: "*",
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:5173",
+      "https://revallusion-admin.vercel.app",
+      "https://ravallusion-repo-mine.vercel.app",
+      "https://ravallusion-repo-mine.vercel.app",
+    ],
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
   })

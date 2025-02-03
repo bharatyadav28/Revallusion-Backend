@@ -184,10 +184,10 @@ exports.signin = async (req, res) => {
   }
 
   // Signin
-  const isMatchPassword = await user.comparePassword(password);
-  if (!isMatchPassword) {
-    throw new BadRequestError("Invalid Password");
-  }
+  // const isMatchPassword = await user.comparePassword(password);
+  // if (!isMatchPassword) {
+  //   throw new BadRequestError("Invalid Password");
+  // }
 
   await OTPManager.generateOTP({
     userId: user._id,
