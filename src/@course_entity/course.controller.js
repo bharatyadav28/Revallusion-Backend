@@ -92,6 +92,26 @@ exports.getCourse = async (req, res) => {
                     as: "videos",
                   },
                 },
+
+                {
+                  $lookup: {
+                    from: "assignments",
+                    localField: "_id",
+                    foreignField: "submodule",
+
+                    as: "assignments",
+                  },
+                },
+                {
+                  $addFields: {
+                    assignmentCount: { $size: "$assignments" },
+                  },
+                },
+                {
+                  $project: {
+                    assignments: 0,
+                  },
+                },
               ],
               as: "submodules",
             },

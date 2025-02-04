@@ -55,14 +55,14 @@ exports.attachCookiesToResponse = ({
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + minTime),
     signed: true,
-    // sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
   res.cookie("refreshToken", refreshToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + (keepMeSignedIn ? maxTime : minTime)),
     signed: true,
-    // sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
 
@@ -73,7 +73,7 @@ exports.attachAccessTokenToCookies = ({ res, accessToken }) => {
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + minTime),
     signed: true,
-    // sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
 
@@ -84,6 +84,6 @@ exports.attachTempTokenToCookies = ({ res, tempToken }) => {
     secure: process.env.NODE_ENV === "production",
     expires: new Date(Date.now() + tempTime),
     signed: true,
-    // sameSite: "None",
+    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
