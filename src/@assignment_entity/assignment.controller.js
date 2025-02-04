@@ -1,12 +1,14 @@
-const { NotFoundError } = require("../../errors");
-const AssignmentModel = require("./assignment.model");
 const { StatusCodes } = require("http-status-codes");
+
+const { NotFoundError, BadRequestError } = require("../../errors");
+const AssignmentModel = require("./assignment.model");
+const SubmoduleModel = require("../@submodule_entity/submodule.model");
 
 // Get all submoodule assignments
 exports.getSubmoduleAssignments = async (req, res) => {
-  const { id } = req.params;
+  const { submoduleId } = req.params;
   const assignments = await AssignmentModel.find({
-    submodule: id,
+    submodule: submoduleId,
   });
 
   res.status(StatusCodes.OK).json({
@@ -17,7 +19,20 @@ exports.getSubmoduleAssignments = async (req, res) => {
 
 // Create a new assignments for submodule
 exports.addAssignment = async (req, res) => {
-  const assignment = await AssignmentModel.create(req.body);
+  const { name, fileUrl, submoduleId, courseId, moduleId } = req.body;
+
+  const submodule = await SubmoduleModel.findById(submoduleId);
+  if (!submodule) {
+    throw new NotFoundError("Targeted submodule doesnot exist");
+  }
+
+  const assignment = await AssignmentModel.create({
+    name,
+    fileUrl,
+    course: courseId,
+    module: moduleId,
+    submodule: submoduleId,
+  });
   if (!assignment) {
     throw new BadRequestError("Assignment not created");
   }
@@ -37,7 +52,10 @@ exports.updateAssignment = async (req, res) => {
     throw new NotFoundError("Please provide assignment name");
   }
 
-  const assignment = await AssignmentModel.findOneAndUpdate({ _id: id }, name);
+  const assignment = await AssignmentModel.findOneAndUpdate(
+    { _id: id },
+    { name }
+  );
   if (!assignment) {
     throw new NotFoundError("Assignment not found");
   }

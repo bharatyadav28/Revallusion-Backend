@@ -2,6 +2,16 @@ const mongoose = require("mongoose");
 
 const AssignmentSchema = new mongoose.Schema(
   {
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: [true, "Please provide course id"],
+    },
+    module: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CourseModule",
+      required: [true, "Please provide module id"],
+    },
     submodule: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Submodule",
@@ -22,6 +32,8 @@ const AssignmentSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+AssignmentSchema.index({ submodule: 1 });
 
 const AssignmentModel = mongoose.model("Assignment", AssignmentSchema);
 

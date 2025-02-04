@@ -176,6 +176,7 @@ exports.signin = async (req, res) => {
         user: {
           _id: user._id,
         },
+        isNewUser: true,
       },
     });
   }
@@ -199,6 +200,7 @@ exports.signin = async (req, res) => {
       user: {
         _id: user._id,
       },
+      isNewUser: false,
     },
     message: "Otp sent to registered email or phone number",
   });
