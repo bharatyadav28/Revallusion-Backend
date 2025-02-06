@@ -3,9 +3,8 @@ const { StatusCodes } = require("http-status-codes");
 
 const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
-const SubmoduleModel = require("../@submodule_entity/submodule.model");
-const CourseModuleModel = require("../@course_module_entity/course_module.model");
 const AssignmentModel = require("../@assignment_entity/assignment.model");
+const CourseModel = require("../@course_entity/course.model");
 
 exports.submitAssignment = async (req, res) => {
   const { submittedFileUrls, assignmentId } = req.body;
@@ -51,14 +50,14 @@ exports.getSubmittedAssignments = async (req, res) => {
   const { id: courseId } = req.params;
 
   // Filter params
-  const { moduleId, subModuleId, isGraded } = req.query;
+  const { moduleId, submoduleId, isGraded } = req.query;
 
   // Filter assignments based on course, module and submodule
   const query = {
     course: courseId,
   };
   if (moduleId) query.module = moduleId;
-  if (subModuleId) query.submodule = subModuleId;
+  if (submoduleId) query.submodule = submoduleId;
 
   const allAssignments = await AssignmentModel.find(query).select("_id");
 
@@ -89,9 +88,48 @@ exports.getSubmittedAssignments = async (req, res) => {
       { path: "user", select: "name email" },
     ]);
 
+  // Fetch submodules of this course for filtering
+  const submodules = await CourseModel.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(courseId),
+      },
+    },
+
+    {
+      $lookup: {
+        from: "coursemodules",
+        localField: "_id",
+        foreignField: "course",
+        as: "modules",
+      },
+    },
+    {
+      $unwind: "$modules",
+    },
+    {
+      $lookup: {
+        from: "submodules",
+        localField: "modules._id",
+        foreignField: "module",
+        as: "submodules",
+      },
+    },
+    {
+      $unwind: "$submodules",
+    },
+    {
+      $project: {
+        _id: 0,
+        value: `$submodules._id`,
+        key: `$submodules.name`,
+      },
+    },
+  ]);
+
   return res.status(StatusCodes.OK).json({
     success: true,
-    data: { submittedAssignments },
+    data: { submittedAssignments, submodules },
     message: "Assignments fetch successfully",
   });
 };
