@@ -69,9 +69,25 @@ exports.getSubmittedAssignments = async (req, res) => {
   if (isGraded && isGraded === "yes") query2.score = { $gte: 0 };
   if (isGraded && isGraded === "no") query2.score = null;
 
-  const submittedAssignments = await SubmittedAssignmentModel.find(query2).sort(
-    { submittedAt: -1 }
-  );
+  const submittedAssignments = await SubmittedAssignmentModel.find(query2)
+    .sort({ submittedAt: -1 })
+    .populate([
+      {
+        path: "assignment",
+        select: "name module submodule",
+        populate: [
+          {
+            path: "module",
+            select: "name",
+          },
+          {
+            path: "submodule",
+            select: "name",
+          },
+        ],
+      },
+      { path: "user", select: "name email" },
+    ]);
 
   return res.status(StatusCodes.OK).json({
     success: true,

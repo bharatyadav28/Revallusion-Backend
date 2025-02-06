@@ -12,6 +12,6 @@ const router = express.Router();
 router.route("/").post(auth, submitAssignment);
 router.route("/:id").put(auth, isAdmin, updateScore);
 
-router.route("/course/:id").put(auth, isAdmin, getSubmittedAssignments);
+router.route("/course/:id").get(auth, isAdmin, getSubmittedAssignments);
 
 module.exports = router;

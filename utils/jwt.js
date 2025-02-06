@@ -8,6 +8,14 @@ const maxTime = 1000 * 60 * 60 * 24 * 7;
 
 const tempTime = 1000 * 60 * 5; //  5 min
 
+// Minimum config for all cookies
+const cookieConfig = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  signed: true,
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+};
+
 // Create tokens
 exports.createAccessToken = (payload) => {
   const token = jwt.sign(payload, process.env.ACCESS_SECRET, {
@@ -51,39 +59,28 @@ exports.attachCookiesToResponse = ({
   keepMeSignedIn,
 }) => {
   res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    ...cookieConfig,
     expires: new Date(Date.now() + minTime),
-    signed: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
+
   res.cookie("refreshToken", refreshToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    ...cookieConfig,
     expires: new Date(Date.now() + (keepMeSignedIn ? maxTime : minTime)),
-    signed: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
 
 // Add access token to cookies(incase access token is invalid but refresh token is valid )
 exports.attachAccessTokenToCookies = ({ res, accessToken }) => {
   res.cookie("accessToken", accessToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    ...cookieConfig,
     expires: new Date(Date.now() + minTime),
-    signed: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
 
 // Cookie for a temporary token
 exports.attachTempTokenToCookies = ({ res, tempToken }) => {
   res.cookie("tempToken", tempToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    ...cookieConfig,
     expires: new Date(Date.now() + tempTime),
-    signed: true,
-    sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   });
 };
