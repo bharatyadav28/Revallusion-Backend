@@ -17,7 +17,9 @@ const { default: mongoose } = require("mongoose");
 // Create a new order
 exports.createOrder = async (req, res) => {
   const { plan } = req.body;
-  const userId = req?.user?._id || "67a04e77e4b4f62057ba7a8d";
+  const userId = req?.user?._id;
+  // ||
+  // (process.env.NODE_ENV !== "production" ? "67a2fc5347f7bddfc21c6408" : null);
 
   const user = await UserModel.findById(userId);
   if (!user)

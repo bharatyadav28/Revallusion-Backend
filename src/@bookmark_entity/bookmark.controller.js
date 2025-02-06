@@ -39,6 +39,13 @@ exports.getAllBookMarks = async (req, res) => {
         ],
       },
     },
+
+    {
+      $unwind: {
+        path: "$video",
+        preserveNullAndEmptyArrays: true, // Keep documents even if no matching video is found
+      },
+    },
   ]);
 
   res.status(StatusCodes.OK).json({

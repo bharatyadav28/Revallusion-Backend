@@ -18,7 +18,7 @@ const router = express.Router();
 
 router.route("/get-upload-url").post(auth, isAdmin, getUploadURL);
 
-router.route("/").get(getVideos).post(saveVideo);
+router.route("/").get(auth, isAdmin, getVideos).post(auth, isAdmin, saveVideo);
 
 //NOTE: only for Dev purpose
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
@@ -27,7 +27,7 @@ router.route("/list").get(getVideoList);
 
 router
   .route("/:id")
-  .get(getVideo)
+  .get(auth, getVideo)
   .delete(auth, isAdmin, deleteVideo)
   .put(auth, isAdmin, updateVideo);
 

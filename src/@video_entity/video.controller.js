@@ -11,6 +11,7 @@ const {
   StringToObjectId,
 } = require("../../utils/helperFuns.js");
 const CourseModel = require("../@course_entity/course.model.js");
+const OrderModel = require("../@order_entity/order.model.js");
 
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
@@ -112,16 +113,49 @@ exports.getVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter video id");
   }
 
-  const video = await VideoModel.findOne({ _id: videoId, isDeleted: false });
+  const video = await VideoModel.findOne({
+    _id: videoId,
+    isDeleted: false,
+  })
+    .populate({ path: "course", select: "_id isFree plan" })
+    .select("title description thumbnailUrl videoUrl title")
+    .lean();
+
   if (!video) {
-    throw new BadRequestError("Video not found");
+    throw new BadRequestError("Requested video may not exists");
   }
+
+  if (!video?.course?.isFree) {
+    // Subscription check i.e video is not free
+
+    const order = await OrderModel.findOne({
+      status: "Active",
+      user: req.user._id,
+    });
+
+    if (!order) {
+      throw new BadRequestError("Please purchase a plan to access this video");
+    }
+
+    // Advance subscription has access to videos of all plans
+    if (
+      !order.plan.equals(video?.course?.plan) ||
+      !video.course.title === "Advanced"
+    ) {
+      throw new BadRequestError(
+        "Please upgrade your plan to access this video"
+      );
+    }
+  }
+
   video.thumbnailUrl = appendBucketName(video.thumbnailUrl);
   video.videoUrl = appendBucketName(video.videoUrl);
 
+  const { course, ...filteredVideo } = video;
+
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { video },
+    data: { video: filteredVideo },
     message: "Video fetch successfully",
   });
 };
