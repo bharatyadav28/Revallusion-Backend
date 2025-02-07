@@ -10,11 +10,13 @@ const { awsUrl } = require("../../utils/helperFuns");
 exports.getAllBookMarks = async (req, res) => {
   const bookmarks = await BookmarkModel.aggregate([
     {
+      // Stage 1
       $match: {
         user: new mongoose.Types.ObjectId(req.user._id),
       },
     },
     {
+      // Stage 2: fetch bookmark video (array)
       $lookup: {
         from: "videos",
         localField: "video",
@@ -34,6 +36,7 @@ exports.getAllBookMarks = async (req, res) => {
               title: 1,
               description: 1,
               thumbnailUrl: 1,
+              duration: 1,
             },
           },
         ],
@@ -41,6 +44,7 @@ exports.getAllBookMarks = async (req, res) => {
     },
 
     {
+      // Stage 3: convert video array to obj (Only one video present in array)
       $unwind: {
         path: "$video",
         preserveNullAndEmptyArrays: true, // Keep documents even if no matching video is found

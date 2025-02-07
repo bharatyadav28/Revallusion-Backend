@@ -3,11 +3,11 @@ const { StatusCodes } = require("http-status-codes");
 
 const courseModel = require("./course.model.js");
 const { NotFoundError, BadRequestError } = require("../../errors/index.js");
-const {
-  StringToObjectId,
-  updateSequence,
-} = require("../../utils/helperFuns.js");
+const { StringToObjectId } = require("../../utils/helperFuns.js");
 const VideoModel = require("../@video_entity/video.model.js");
+const PlanModel = require("../@plan_entity/plan.model.js");
+const OrderModel = require("../@order_entity/order.model.js");
+const { awsUrl } = require("../../utils/helperFuns.js");
 
 // Add a course
 exports.addCourse = async (req, res) => {
@@ -52,19 +52,23 @@ exports.getCoursesNames = async (req, res) => {
 exports.getCourse = async (req, res) => {
   const [course] = await courseModel.aggregate([
     {
+      // Stage 1
       $match: {
         _id: StringToObjectId(req.params.id),
       },
     },
     {
       $lookup: {
+        // Stage 2, fetch course modules
         from: "coursemodules",
         localField: "_id",
         foreignField: "course",
         pipeline: [
-          // Nested lookup to get submodules for each module
+          //  Select specific modules fields
           { $project: { _id: 1, name: 1 } },
+
           {
+            // Fetch course submodules
             $lookup: {
               from: "submodules",
               localField: "_id",
@@ -72,9 +76,12 @@ exports.getCourse = async (req, res) => {
               pipeline: [
                 // Sort submodules by sequence
                 { $sort: { sequence: 1 } },
+
+                // TODO: submodule/ assignment thumbnail url path
                 // Nested lookup to get videos for each submodule
                 { $project: { _id: 1, name: 1, sequence: 1, thumbnailUrl: 1 } },
                 {
+                  // Fetch submodule videos
                   $lookup: {
                     from: "videos",
                     localField: "_id",
@@ -94,6 +101,7 @@ exports.getCourse = async (req, res) => {
                 },
 
                 {
+                  // Fetch submodule assignments
                   $lookup: {
                     from: "assignments",
                     localField: "_id",
@@ -103,11 +111,13 @@ exports.getCourse = async (req, res) => {
                   },
                 },
                 {
+                  // Add assignments count
                   $addFields: {
                     assignmentCount: { $size: "$assignments" },
                   },
                 },
                 {
+                  // Remove assignments
                   $project: {
                     assignments: 0,
                   },
@@ -120,8 +130,8 @@ exports.getCourse = async (req, res) => {
         as: "modules",
       },
     },
-    // Optional: Lookup for free videos directly associated with course
     {
+      // Stage 3  Free videos for introducory course
       $lookup: {
         from: "videos",
         localField: "_id",
@@ -247,5 +257,134 @@ exports.updateVideoSequence = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Video sequence updated successfully",
+  });
+};
+
+// Fetch Subscribed course data
+exports.getSubscribedPlanCourse = async (req, res) => {
+  const userId = req.user._id;
+  const { planId } = req.params;
+
+  // Access user plan
+  const orderPromise = OrderModel.findOne({
+    user: userId,
+    status: "Active",
+  }).populate({
+    path: "plan",
+    select: "_id level",
+  });
+
+  const requestedPlanPromise = PlanModel.findById(planId);
+
+  const [order, requestedPlan] = await Promise.all([
+    orderPromise,
+    requestedPlanPromise,
+  ]);
+
+  if (!order) {
+    throw new NotFoundError("Please subscribe to a plan");
+  }
+  if (!requestedPlan) {
+    throw new NotFoundError("Requested plan may not exists");
+  }
+
+  const currentPlanLevel = order.plan.level;
+
+  // Check if user has access to this course
+  if (
+    currentPlanLevel === Number(process.env.BEGINNER_PLAN) &&
+    requestedPlan.level === Number(process.env.ADVANCE_PLAN)
+  ) {
+    throw new BadRequestError("Please upgrade your plan to access this course");
+  }
+
+  const [courseData] = await courseModel.aggregate([
+    {
+      // Stage 1
+      $match: {
+        plan: new mongoose.Types.ObjectId(planId),
+      },
+    },
+    {
+      // Stage 2: fetch modules of a couse
+      $lookup: {
+        from: "coursemodules",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          // Select specific module fields
+          { $project: { _id: 1, name: 1 } },
+
+          {
+            // Fetch submodules of a module
+            $lookup: {
+              from: "submodules",
+              localField: "_id",
+              foreignField: "module",
+
+              pipeline: [
+                // Sort modules by sequence
+                { $sort: { sequence: 1 } },
+
+                // Select specific submodule fields
+                { $project: { _id: 1, name: 1, thumbnailUrl: 1, sequence: 1 } },
+
+                {
+                  // Fetch videos of a submodule
+                  $lookup: {
+                    from: "videos",
+                    localField: "_id",
+                    foreignField: "submodule",
+                    pipeline: [
+                      {
+                        $match: {
+                          isDeleted: false,
+                          isActive: true,
+                        },
+                      },
+                      {
+                        // Append aws url to thumbnail path
+                        $addFields: {
+                          thumbnailUrl: {
+                            $concat: [awsUrl, "/", "$thumbnailUrl"],
+                          },
+                        },
+                      },
+                      { $sort: { sequence: 1 } },
+                      {
+                        $project: {
+                          _id: 1,
+                          name: 1,
+                          thumbnailUrl: 1,
+                          duration: 1,
+                          sequence: 1,
+                        },
+                      },
+                    ],
+                    as: "videos",
+                  },
+                },
+              ],
+              as: "submodules",
+            },
+          },
+        ],
+        as: "modules",
+      },
+    },
+    {
+      // Stage 3: Select specific course fields
+      $project: {
+        _id: 1,
+        title: 1,
+        modules: 1,
+      },
+    },
+  ]);
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { course: courseData },
+    message: "Course fetch successfully",
   });
 };

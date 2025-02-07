@@ -5,6 +5,7 @@ const {
   getSubmoduleAssignments,
   updateAssignment,
   deleteAssignment,
+  getSubscriptionAssignments,
 } = require("./assignment.controller");
 const { auth, isAdmin } = require("../../middlewares/authentication");
 
@@ -18,5 +19,7 @@ router
   .delete(auth, isAdmin, deleteAssignment);
 
 router.route("/submodule/:submoduleId").get(auth, getSubmoduleAssignments);
+
+router.route("/plan/:planId").get(auth, getSubscriptionAssignments);
 
 module.exports = router;

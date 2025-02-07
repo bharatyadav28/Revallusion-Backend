@@ -110,11 +110,13 @@ exports.getVideos = async (req, res, next) => {
 exports.getIntroductoryVideos = async (req, res) => {
   const [freeVideos] = await CourseModel.aggregate([
     {
+      // Stage 1
       $match: {
         isFree: true,
       },
     },
     {
+      // Stage 2: fetch introductory videos
       $lookup: {
         from: "videos",
         localField: "_id",
@@ -144,6 +146,7 @@ exports.getIntroductoryVideos = async (req, res) => {
               title: 1,
               description: 1,
               thumbnailUrl: 1,
+              duration: 1,
               sequence: 1,
             },
           },
@@ -152,6 +155,7 @@ exports.getIntroductoryVideos = async (req, res) => {
       },
     },
     {
+      // Stage 3: Select specific field
       $project: {
         introductoryVideos: 1,
       },
@@ -173,13 +177,22 @@ exports.getVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter video id");
   }
 
-  const video = await VideoModel.findOne({
+  const videoPromise = await VideoModel.findOne({
     _id: videoId,
     isDeleted: false,
   })
     .populate({ path: "course", select: "_id isFree plan" })
     .select("title description thumbnailUrl videoUrl title")
     .lean();
+
+  const orderPromise = await OrderModel.findOne({
+    status: "Active",
+    user: req.user._id,
+  })
+    .populate({ path: "plan", select: "_id level" })
+    .lean();
+
+  const [video, order] = await Promise.all([videoPromise, orderPromise]);
 
   if (!video) {
     throw new BadRequestError("Requested video may not exists");
@@ -188,19 +201,14 @@ exports.getVideo = async (req, res, next) => {
   if (!video?.course?.isFree) {
     // Subscription check i.e video is not free
 
-    const order = await OrderModel.findOne({
-      status: "Active",
-      user: req.user._id,
-    });
-
     if (!order) {
       throw new BadRequestError("Please purchase a plan to access this video");
     }
 
     // Advance subscription has access to videos of all plans
     if (
-      !order.plan.equals(video?.course?.plan) ||
-      !video.course.title === "Advanced"
+      !order.plan._id.equals(video?.course?.plan) &&
+      order.plan.level !== Number(process.env.ADVANCE_PLAN)
     ) {
       throw new BadRequestError(
         "Please upgrade your plan to access this video"

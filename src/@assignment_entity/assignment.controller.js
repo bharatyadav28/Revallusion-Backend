@@ -3,6 +3,10 @@ const { StatusCodes } = require("http-status-codes");
 const { NotFoundError, BadRequestError } = require("../../errors");
 const AssignmentModel = require("./assignment.model");
 const SubmoduleModel = require("../@submodule_entity/submodule.model");
+const OrderModel = require("../@order_entity/order.model");
+const { awsUrl } = require("../../utils/helperFuns");
+const { default: mongoose } = require("mongoose");
+const CourseModel = require("../@course_entity/course.model");
 
 // Get all submoodule assignments
 exports.getSubmoduleAssignments = async (req, res) => {
@@ -75,5 +79,78 @@ exports.deleteAssignment = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Assignment deleted successfully",
+  });
+};
+
+//TODO: Get all assignments based on plan purchased
+exports.getSubscriptionAssignments = async (req, res) => {
+  const user = req.user._id;
+
+  const { planId } = req.params;
+  const orderPromise = OrderModel.findOne({
+    user: user,
+    plan: planId,
+    status: "Active",
+  });
+
+  const coursePromise = CourseModel.findOne({
+    plan: planId,
+  });
+
+  const [order, course] = await Promise.all([orderPromise, coursePromise]);
+
+  if (order) {
+    const courseId = course._id;
+
+    const assignments = await AssignmentModel.aggregate([
+      {
+        $match: {
+          course: courseId,
+        },
+      },
+      {
+        $group: {
+          _id: "$module",
+          moduleId: { $first: "$module" },
+
+          assignments: {
+            $push: {
+              _id: "$_id",
+              name: "$name",
+              fileUrl: awsUrl + "/" + "$fileUrl",
+            },
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "coursemodules", // The modules collection
+          localField: "_id",
+          foreignField: "_id",
+          as: "moduleDetails",
+        },
+      },
+      {
+        $unwind: "$moduleDetails",
+      },
+      {
+        $project: {
+          _id: 0, // Remove default _id
+          moduleId: 1, // Keep module ID
+          moduleName: "$moduleDetails.name", // Extract module name
+          assignments: 1,
+        },
+      },
+    ]);
+
+    return res.status(StatusCodes.OK).json({
+      success: true,
+      data: { assignments },
+    });
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { assignments: "No assignments" },
   });
 };

@@ -112,33 +112,6 @@ exports.updateSubModule = async (req, res) => {
       await session.endSession();
       throw error;
     }
-
-    //TODO: 3. Update submodule id in video model for each video in that module
-    // const videosUpdatePromises = submodule.videos.map(async (video) => {
-    //   const updatedVideo = VideoModel.findByIdAndUpdate(
-    //     video.videoId,
-    //     {
-    //       module: newModuleId,
-    //     },
-    //     {
-    //       new: true,
-    //       runValidators: true,
-    //     }
-    //   );
-    //   return updatedVideo;
-    // });
-
-    // const results = await Promise.all(videosUpdatePromises);
-
-    // // Check for errors in the results
-    // const errors = results.filter((result) => result && result?.error);
-
-    // if (errors.length > 0) {
-    //   throw new BadRequestError(
-    //     "Error in submodule id in video model:",
-    //     errors
-    //   );
-    // }
   } else if (sequence && sequence !== currentSequence) {
     // Case 2: Submodule is moved in the same module
 

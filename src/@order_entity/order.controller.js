@@ -58,6 +58,7 @@ exports.createOrder = async (req, res) => {
       const activePlanType = activeOrder.plan.plan_type;
       const newPlanType = existingPlan.plan_type;
 
+      // TODO: Advance dynamic check
       if (
         activePlanType === newPlanType ||
         (activePlanType === "Advanced" && newPlanType === "Begineer")
