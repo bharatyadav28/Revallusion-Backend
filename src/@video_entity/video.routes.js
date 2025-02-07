@@ -12,6 +12,7 @@ const {
   deleteAllVideos,
   updateActiveStatus,
   getVideoList,
+  getIntroductoryVideos,
 } = require("./video.controller.js");
 
 const router = express.Router();
@@ -24,6 +25,8 @@ router.route("/").get(auth, isAdmin, getVideos).post(auth, isAdmin, saveVideo);
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
 
 router.route("/list").get(getVideoList);
+
+router.route("/introductory-videos").get(getIntroductoryVideos);
 
 router
   .route("/:id")

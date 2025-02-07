@@ -25,6 +25,4 @@ router.route("/google-auth").post(googleAuth);
 router.route("/send-me").get(auth, sendMe);
 router.route("/logout").delete(auth, logout);
 
-router.route("/introductory-videos").get(getIntroductoryVideos);
-
 module.exports = router;

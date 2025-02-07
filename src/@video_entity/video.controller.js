@@ -106,6 +106,66 @@ exports.getVideos = async (req, res, next) => {
   });
 };
 
+// Fetch only free videos
+exports.getIntroductoryVideos = async (req, res) => {
+  const [freeVideos] = await CourseModel.aggregate([
+    {
+      $match: {
+        isFree: true,
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "_id",
+        foreignField: "course",
+        pipeline: [
+          {
+            $match: {
+              isDeleted: false,
+              isActive: true,
+            },
+          },
+          {
+            $sort: {
+              sequence: 1,
+            },
+          },
+          {
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+              description: 1,
+              thumbnailUrl: 1,
+              sequence: 1,
+            },
+          },
+        ],
+        as: "introductoryVideos",
+      },
+    },
+    {
+      $project: {
+        introductoryVideos: 1,
+      },
+    },
+  ]);
+
+  const introductoryVideos = freeVideos?.introductoryVideos || [];
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { introductoryVideos },
+  });
+};
+
 // Fetch a single video
 exports.getVideo = async (req, res, next) => {
   const videoId = req.params.id;

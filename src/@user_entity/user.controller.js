@@ -31,7 +31,7 @@ const {
 } = require("../../utils/helperFuns.js");
 const OTPManager = require("../../utils/OTPManager.js");
 const { appendBucketName, awsUrl } = require("../../utils/helperFuns.js");
-const CourseModel = require("../@course_entity/course.model.js");
+const OrderModel = require("../@order_entity/order.model.js");
 
 //  User's home page content
 exports.getHomeContent = async (req, res, next) => {
@@ -128,13 +128,25 @@ exports.getHomeContent = async (req, res, next) => {
 exports.sendMe = async (req, res) => {
   const userId = req.user._id;
 
-  const user = await userModel.findOne({ _id: userId, isDeleted: false });
+  const user = await userModel
+    .findOne({ _id: userId, isDeleted: false })
+    .select("_id name email mobile role isEmailVerified isMobileVerified")
+    .lean();
 
-  const userData = filterUserData(user);
+  let hasSubscription = false;
+
+  if (user.role !== "admin") {
+    const order = await OrderModel.findOne({
+      user: userId,
+      status: "Active",
+    });
+
+    if (order) hasSubscription = true;
+  }
 
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { user: userData },
+    data: { user: { ...user, hasSubscription } },
     message: "User details fetched successfully",
   });
 };
@@ -438,64 +450,5 @@ exports.logout = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Logout successfully",
-  });
-};
-
-exports.getIntroductoryVideos = async (req, res) => {
-  const [freeVideos] = await CourseModel.aggregate([
-    {
-      $match: {
-        isFree: true,
-      },
-    },
-    {
-      $lookup: {
-        from: "videos",
-        localField: "_id",
-        foreignField: "course",
-        pipeline: [
-          {
-            $match: {
-              isDeleted: false,
-              isActive: true,
-            },
-          },
-          {
-            $sort: {
-              sequence: 1,
-            },
-          },
-          {
-            $addFields: {
-              thumbnailUrl: {
-                $concat: [awsUrl, "/", "$thumbnailUrl"],
-              },
-            },
-          },
-          {
-            $project: {
-              _id: 1,
-              title: 1,
-              description: 1,
-              thumbnailUrl: 1,
-              sequence: 1,
-            },
-          },
-        ],
-        as: "introductoryVideos",
-      },
-    },
-    {
-      $project: {
-        introductoryVideos: 1,
-      },
-    },
-  ]);
-
-  const introductoryVideos = freeVideos?.introductoryVideos || [];
-
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    data: { introductoryVideos },
   });
 };
