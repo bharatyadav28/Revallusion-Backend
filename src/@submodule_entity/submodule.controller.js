@@ -4,6 +4,7 @@ const { StatusCodes } = require("http-status-codes");
 const CourseModuleModel = require("../@course_module_entity/course_module.model.js");
 const SubmoduleModel = require("./submodule.model.js");
 const { NotFoundError, BadRequestError } = require("../../errors/index.js");
+const { extractURLKey } = require("../../utils/helperFuns.js");
 
 // Add a new submodule inside module
 exports.addSubModule = async (req, res) => {
@@ -19,12 +20,14 @@ exports.addSubModule = async (req, res) => {
   // Get sequence number for new submodue
   const sequence = await SubmoduleModel.getNextSequence(moduleId);
 
+  const thumbnailPath = extractURLKey(thumbnailUrl);
+
   // Add the submodule
   const submodule = await SubmoduleModel.create({
     module: moduleId,
     name,
     sequence,
-    thumbnailUrl,
+    thumbnailUrl: thumbnailPath,
   });
 
   if (!submodule) {
@@ -51,7 +54,11 @@ exports.updateSubModule = async (req, res) => {
   if (!submodule) throw new NotFoundError("Requested submodule may not exists");
 
   if (name) submodule.name = name;
-  if (thumbnailUrl) submodule.thumbnailUrl = thumbnailUrl;
+  if (thumbnailUrl) {
+    const thumbnailPath = extractURLKey(thumbnailUrl);
+
+    submodule.thumbnailUrl = thumbnailPath;
+  }
 
   const currentSequence = submodule.sequence;
 

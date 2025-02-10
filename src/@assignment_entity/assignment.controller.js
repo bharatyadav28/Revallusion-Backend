@@ -4,16 +4,34 @@ const { NotFoundError, BadRequestError } = require("../../errors");
 const AssignmentModel = require("./assignment.model");
 const SubmoduleModel = require("../@submodule_entity/submodule.model");
 const OrderModel = require("../@order_entity/order.model");
-const { awsUrl } = require("../../utils/helperFuns");
+const { awsUrl, extractURLKey } = require("../../utils/helperFuns");
 const { default: mongoose } = require("mongoose");
 const CourseModel = require("../@course_entity/course.model");
 
 // Get all submoodule assignments
 exports.getSubmoduleAssignments = async (req, res) => {
   const { submoduleId } = req.params;
-  const assignments = await AssignmentModel.find({
-    submodule: submoduleId,
-  });
+  // const assignments = await AssignmentModel.find({
+  //   submodule: submoduleId,
+  // });
+
+  const assignments = await AssignmentModel.aggregate([
+    {
+      $match: {
+        submodule: new mongoose.Types.ObjectId(submoduleId),
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        fileUrl: {
+          $concat: [awsUrl, "/", "$fileUrl"],
+        },
+        createdAt: 1,
+      },
+    },
+  ]);
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -30,9 +48,11 @@ exports.addAssignment = async (req, res) => {
     throw new NotFoundError("Targeted submodule doesnot exist");
   }
 
+  const filePath = extractURLKey(fileUrl);
+
   const assignment = await AssignmentModel.create({
     name,
-    fileUrl,
+    fileUrl: filePath,
     course: courseId,
     module: moduleId,
     submodule: submoduleId,

@@ -76,8 +76,14 @@ exports.getCourse = async (req, res) => {
               pipeline: [
                 // Sort submodules by sequence
                 { $sort: { sequence: 1 } },
+                {
+                  $addFields: {
+                    thumbnailUrl: {
+                      $concat: [awsUrl, "/", "$thumbnailUrl"],
+                    },
+                  },
+                },
 
-                // TODO: submodule/ assignment thumbnail url path
                 // Nested lookup to get videos for each submodule
                 { $project: { _id: 1, name: 1, sequence: 1, thumbnailUrl: 1 } },
                 {
@@ -325,6 +331,14 @@ exports.getSubscribedPlanCourse = async (req, res) => {
               pipeline: [
                 // Sort modules by sequence
                 { $sort: { sequence: 1 } },
+
+                {
+                  $addFields: {
+                    thumbnailUrl: {
+                      $concat: [awsUrl, "/", "$thumbnailUrl"],
+                    },
+                  },
+                },
 
                 // Select specific submodule fields
                 { $project: { _id: 1, name: 1, thumbnailUrl: 1, sequence: 1 } },

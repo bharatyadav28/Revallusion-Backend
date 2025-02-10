@@ -5,15 +5,21 @@ const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
 const AssignmentModel = require("../@assignment_entity/assignment.model");
 const CourseModel = require("../@course_entity/course.model");
+const { extractURLKey, appendBucketName } = require("../../utils/helperFuns");
 
 exports.submitAssignment = async (req, res) => {
   const { submittedFileUrls, assignmentId } = req.body;
   const user = req.user._id;
 
+  const filePaths = [];
+  for (let i = 0; i < submittedFileUrls.length; i++) {
+    filePaths.push(extractURLKey(submittedFileUrls[i]));
+  }
+
   const assignment = await SubmittedAssignmentModel.create({
     assignment: assignmentId,
     user,
-    submittedFileUrls,
+    submittedFileUrls: filePaths,
   });
 
   if (!assignment) {
@@ -61,10 +67,11 @@ exports.getSubmittedAssignments = async (req, res) => {
 
   const allAssignments = await AssignmentModel.find(query).select("_id");
 
-  // Filter submitted assignments based on graded or not
   let query2 = {
     assignment: { $in: allAssignments.map((assignment) => assignment._id) },
   };
+
+  // Filter submitted assignments based on graded or not
   if (isGraded && isGraded === "yes") query2.score = { $gte: 0 };
   if (isGraded && isGraded === "no") query2.score = null;
 
@@ -86,7 +93,13 @@ exports.getSubmittedAssignments = async (req, res) => {
         ],
       },
       { path: "user", select: "name email" },
-    ]);
+    ])
+    .lean();
+
+  submittedAssignments.forEach((assignment) => {
+    assignment.submittedFileUrls =
+      assignment.submittedFileUrls.map(appendBucketName);
+  });
 
   // Fetch submodules of this course for filtering
   const submodules = await CourseModel.aggregate([
