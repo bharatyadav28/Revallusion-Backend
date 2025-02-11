@@ -212,3 +212,21 @@ exports.verifyPayment = async (req, res) => {
     message: "Payment verified successfully",
   });
 };
+
+// Check if user has subscrition
+exports.hasSubscription = async (req, res) => {
+  const { userId } = req.params;
+
+  const activeOrder = await OrderModel.findOne({
+    user: StringToObjectId(userId),
+    status: "Active",
+  });
+
+  let hasSubscription = false;
+  if (activeOrder) hasSubscription = true;
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { hasSubscription },
+  });
+};

@@ -1,5 +1,13 @@
 const mongoose = require("mongoose");
 
+const ResourceSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: [true, "Please enter resource url"],
+    trim: true,
+  },
+});
+
 const SubmoduleSchema = new mongoose.Schema({
   name: {
     type: String,
@@ -16,6 +24,7 @@ const SubmoduleSchema = new mongoose.Schema({
     type: Number,
     required: [true, "Please enter sub-module sequence"],
   },
+  resources: [ResourceSchema],
 });
 SubmoduleSchema.index({ module: 1, sequence: 1 });
 

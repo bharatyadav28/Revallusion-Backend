@@ -12,7 +12,7 @@ const errorMiddleware = (error, req, res, next) => {
 
   // Upload error
   if (error instanceof multer.MulterError) {
-    if (err.code === "LIMIT_FILE_SIZE") {
+    if (error.code === "LIMIT_FILE_SIZE") {
       customError.message = "File size is too large";
     }
 

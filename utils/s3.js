@@ -174,8 +174,8 @@ exports.s3UploadMulti = async (files) => {
 
   const params = files.map((file) => {
     return {
-      Bucket: process.env.AWS_BUCKET_NAME_EMAIL,
-      Key: `emails/${Date.now().toString()}-${
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `resources/${Date.now().toString()}-${
         file.originalname ? file.originalname : "not"
       }`,
       Body: file.buffer,
@@ -209,8 +209,8 @@ exports.s3UploadMulti = async (files) => {
 
   const params = files.map((file) => {
     return {
-      Bucket: process.env.AWS_BUCKET_NAME_EMAIL,
-      Key: `emails/${Date.now().toString()}-${
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: `resources/${Date.now().toString()}-${
         file.originalname ? file.originalname : "not"
       }`,
       Body: file.buffer,
