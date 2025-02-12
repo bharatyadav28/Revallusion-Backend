@@ -17,7 +17,7 @@ router.route("/:id").put(auth, isAdmin, updateSubModule);
 
 router
   .route("/:id/resource")
-  .get(auth, isAdmin, getResources)
+  .get(getResources)
   .post(auth, isAdmin, upload.array("file"), addResource);
 
 router.route("/:id/resource/:rid").delete(auth, isAdmin, deleteResource);
