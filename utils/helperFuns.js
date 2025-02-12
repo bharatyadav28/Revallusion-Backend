@@ -115,14 +115,13 @@ exports.updateSequence = ({
 };
 
 exports.getFrontendDomain = (req) => {
-  const host = req.get("host"); // Get the domain or host from the request
+  // Try X-Forwarded-Host first, fall back to Host header
+  const host = req.get("X-Forwarded-Host") || req.get("host");
+  const protocol = req.get("X-Forwarded-Proto") || req.protocol;
 
-  let domain = "";
   if (host.includes("localhost") || host.includes("127.0.0.1")) {
-    domain = "http://localhost:3000"; // Local development URL
-  } else {
-    domain = `https://${host}`; // Production URL, which uses the current domain
+    return "http://localhost:3000"; // Development frontend URL
   }
 
-  return domain;
+  return `${protocol}://${host}`;
 };

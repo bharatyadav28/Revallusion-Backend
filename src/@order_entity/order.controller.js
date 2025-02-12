@@ -205,12 +205,13 @@ exports.verifyPayment = async (req, res) => {
   }
 
   const frontendDomain = getFrontendDomain(req);
-  res.redirect(`${frontendDomain}/verify-payment`);
+  console.log("Frontend domain", frontendDomain);
+  return res.redirect(`${frontendDomain}/verify-payment`);
 
-  return res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Payment verified successfully",
-  });
+  // return res.status(StatusCodes.OK).json({
+  //   success: true,
+  //   message: "Payment verified successfully",
+  // });
 };
 
 // Check if user has subscrition

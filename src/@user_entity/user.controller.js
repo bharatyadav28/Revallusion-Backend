@@ -38,6 +38,7 @@ exports.getHomeContent = async (req, res, next) => {
   // Queries
   const heroSection = HeroSectionModel.findOne();
   const carousal = CarousalModel.find()
+    .sort({ sequence: 1 })
     .populate({
       path: "video",
       select: "title description thumbnailUrl videoUrl",
@@ -45,6 +46,7 @@ exports.getHomeContent = async (req, res, next) => {
     .lean();
 
   const latestTutorials = LatestTutorialsModel.find()
+    .sort({ sequence: 1 })
     .populate({
       path: "video",
       select: "title description thumbnailUrl videoUrl",
