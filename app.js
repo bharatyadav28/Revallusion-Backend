@@ -27,6 +27,7 @@ app.use(
       "https://revallusion-admin.vercel.app",
       "https://ravallusion-repo-mine.vercel.app",
       "https://www.ravallusion.com",
+      "https://ravallusion.com",
     ],
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,

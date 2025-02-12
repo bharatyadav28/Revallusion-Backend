@@ -319,7 +319,6 @@ exports.getSubscribedPlanCourse = async (req, res) => {
         foreignField: "course",
         pipeline: [
           // Select specific module fields
-          { $project: { _id: 1, name: 1 } },
 
           {
             // Fetch submodules of a module
@@ -331,17 +330,6 @@ exports.getSubscribedPlanCourse = async (req, res) => {
               pipeline: [
                 // Sort modules by sequence
                 { $sort: { sequence: 1 } },
-
-                {
-                  $addFields: {
-                    thumbnailUrl: {
-                      $concat: [awsUrl, "/", "$thumbnailUrl"],
-                    },
-                  },
-                },
-
-                // Select specific submodule fields
-                { $project: { _id: 1, name: 1, thumbnailUrl: 1, sequence: 1 } },
 
                 {
                   // Fetch videos of a submodule
@@ -368,7 +356,7 @@ exports.getSubscribedPlanCourse = async (req, res) => {
                       {
                         $project: {
                           _id: 1,
-                          name: 1,
+                          title: 1,
                           thumbnailUrl: 1,
                           duration: 1,
                           sequence: 1,
@@ -378,20 +366,52 @@ exports.getSubscribedPlanCourse = async (req, res) => {
                     as: "videos",
                   },
                 },
+
+                {
+                  $addFields: {
+                    thumbnailUrl: {
+                      $concat: [awsUrl, "/", "$thumbnailUrl"],
+                    },
+                    videoCount: { $size: { $ifNull: ["$videos", []] } },
+                  },
+                },
+
+                // Select specific submodule fields
+                {
+                  $project: {
+                    _id: 1,
+                    name: 1,
+                    thumbnailUrl: 1,
+                    sequence: 1,
+                    videoCount: 1,
+                    videos: 1,
+                  },
+                },
               ],
               as: "submodules",
+            },
+          },
+
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+              videoCount: { $sum: "$submodules.videoCount" },
+              submodules: 1,
             },
           },
         ],
         as: "modules",
       },
     },
+
     {
       // Stage 3: Select specific course fields
       $project: {
         _id: 1,
         title: 1,
         modules: 1,
+        totalVideos: { $sum: "$modules.videoCount" },
       },
     },
   ]);
