@@ -46,7 +46,7 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       trim: true,
-      default: "http://",
+      // default: "https://cdn-icons-png.flaticon.com/512/5556/5556499.png",
     },
 
     email: {

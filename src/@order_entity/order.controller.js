@@ -61,7 +61,7 @@ exports.createOrder = async (req, res) => {
       // TODO: Advance dynamic check
       if (
         activePlanType === newPlanType ||
-        (activePlanType === "Advanced" && newPlanType === "Begineer")
+        (activePlanType === "Advanced" && newPlanType === "Beginner")
       ) {
         throw new BadRequestError("You already have this plan");
       }

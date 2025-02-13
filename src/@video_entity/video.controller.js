@@ -591,9 +591,9 @@ exports.deleteAllVideos = async (req, res, next) => {
 
 // Get video list with specific fields
 exports.getVideoList = async (req, res, next) => {
-  const { search } = req.query;
+  const { search, resultPerPage, currentPage } = req.query;
 
-  let query = { isDeleted: false };
+  let query = { isDeleted: false, isActive: true };
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: "i" } },
@@ -601,11 +601,27 @@ exports.getVideoList = async (req, res, next) => {
     ];
   }
 
-  const videos = await VideoModel.find(query).select("title description");
+  const limit = Number(resultPerPage) || 8;
+  const page = Number(currentPage) || 1;
+  const skip = (page - 1) * limit;
+
+  const videosPromise = await VideoModel.find(query)
+    .skip(skip)
+    .limit(limit)
+    .select("title description");
+
+  const videosCountPromise = await VideoModel.countDocuments(query);
+
+  const [videos, videosCount] = await Promise.all([
+    videosPromise,
+    videosCountPromise,
+  ]);
+
+  const pagesCount = Math.ceil(videosCount / limit) || 1;
 
   return res.status(StatusCodes.OK).json({
     success: true,
-    data: { videos },
+    data: { videos, pagesCount },
     message: "Videos fetch successfully",
   });
 };

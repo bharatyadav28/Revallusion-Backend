@@ -56,7 +56,8 @@ exports.getSubmittedAssignments = async (req, res) => {
   const { id: courseId } = req.params;
 
   // Filter params
-  const { moduleId, submoduleId, isGraded } = req.query;
+  const { moduleId, submoduleId, isGraded, resultPerPage, currentPage } =
+    req.query;
 
   // Filter assignments based on course, module and submodule
   const query = {
@@ -78,6 +79,10 @@ exports.getSubmittedAssignments = async (req, res) => {
   if (isGraded && isGraded === "yes") query2.score = { $gte: 0 };
   if (isGraded && isGraded === "no") query2.score = null;
 
+  const limit = Number(resultPerPage) || 8;
+  const page = Number(currentPage) || 1;
+  const skip = (page - 1) * limit;
+
   const submittedAssignmentsPromise = SubmittedAssignmentModel.aggregate([
     {
       $match: query2,
@@ -87,6 +92,12 @@ exports.getSubmittedAssignments = async (req, res) => {
       $sort: {
         submittedAt: -1,
       },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
     },
     {
       // Submitted user details
@@ -289,14 +300,21 @@ exports.getSubmittedAssignments = async (req, res) => {
     },
   ]);
 
-  const [submittedAssignments, submodules] = await Promise.all([
-    submittedAssignmentsPromise,
-    submodulesPromise,
-  ]);
+  const submittedAssignmentsCountPromise =
+    SubmittedAssignmentModel.countDocuments(query2);
+
+  const [submittedAssignments, submodules, submittedAssignmentsCount] =
+    await Promise.all([
+      submittedAssignmentsPromise,
+      submodulesPromise,
+      submittedAssignmentsCountPromise,
+    ]);
+
+  const pagesCount = Math.ceil(submittedAssignmentsCount / limit) || 1;
 
   return res.status(StatusCodes.OK).json({
     success: true,
-    data: { submittedAssignments, submodules },
+    data: { submittedAssignments, submodules, pagesCount },
     message: "Assignments fetch successfully",
   });
 };
