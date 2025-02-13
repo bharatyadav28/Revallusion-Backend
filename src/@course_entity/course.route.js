@@ -9,6 +9,7 @@ const {
   getCoursesNames,
   updateVideoSequence,
   getSubscribedPlanCourse,
+  getCourseTitle,
 } = require("./course.controller");
 const { auth, isAdmin } = require("../../middlewares/authentication");
 
@@ -21,6 +22,8 @@ router
   .route("/getSubscribedPlanCourse/:planId")
   .get(auth, getSubscribedPlanCourse);
 router.route("/:id").put(auth, isAdmin, updateCourse).get(getCourse);
+
+router.route("/:id/title").get(getCourseTitle);
 
 router.route("/video-sequence/:id").put(updateVideoSequence);
 

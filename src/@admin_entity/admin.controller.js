@@ -108,6 +108,21 @@ exports.uploadImage = async (req, res) => {
   });
 };
 
+exports.sendMeAmin = async (req, res) => {
+  const userId = req.user._id;
+
+  const user = await userModel
+    .findOne({ _id: userId, isDeleted: false })
+    .select("_id name email mobile role isEmailVerified isMobileVerified")
+    .lean();
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { user: { ...user } },
+    message: "User details fetched successfully",
+  });
+};
+
 // Upload any type of file
 exports.uploadFile = async (req, res) => {
   if (!req.file) {

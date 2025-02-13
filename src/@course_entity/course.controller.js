@@ -266,6 +266,17 @@ exports.updateVideoSequence = async (req, res) => {
   });
 };
 
+exports.getCourseTitle = async (req, res) => {
+  const { id } = req.params;
+
+  const course = await courseModel.findById(id).select("title");
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Course name fetched successfully",
+    course,
+  });
+};
+
 // Fetch Subscribed course data
 exports.getSubscribedPlanCourse = async (req, res) => {
   const userId = req.user._id;

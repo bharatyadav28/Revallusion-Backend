@@ -29,6 +29,10 @@ const SubmittedAssignmentSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isRevoked: {
+    type: Boolean,
+    default: false,
+  },
 });
 
 SubmittedAssignmentSchema.index({ assignmentId: 1, userId: 1 });

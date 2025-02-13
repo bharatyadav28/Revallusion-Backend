@@ -7,12 +7,49 @@ const {
   updateSequence,
   StringToObjectId,
 } = require("../../utils/helperFuns.js");
+const { awsUrl } = require("../../utils/helperFuns.js");
 
 // Get all latest tutorials
 exports.getAllLatestTutorials = async (req, res) => {
-  const tutorials = await LatestTutorailsModel.find()
-    .populate({ path: "video", select: "title description" })
-    .lean();
+  // const tutorials = await LatestTutorailsModel.find()
+  //   .populate({ path: "video", select: "title description" })
+  //   .lean();
+
+  const tutorials = await LatestTutorailsModel.aggregate([
+    { $sort: { sequence: 1 } },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "video",
+        foreignField: "_id",
+        as: "video",
+        pipeline: [
+          {
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl + "/" + "$thumbnailUrl"],
+              },
+              videoUrl: {
+                $concat: [awsUrl + "/" + "$videoUrl"],
+              },
+            },
+          },
+
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              thumbnailUrl: 1,
+              videoUrl: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$video",
+    },
+  ]);
 
   res.status(StatusCodes.OK).json({
     success: true,

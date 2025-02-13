@@ -5,6 +5,7 @@ const { NotFoundError } = require("../../errors/index.js");
 const {
   extractURLKey,
   appendBucketName,
+  awsUrl,
 } = require("../../utils/helperFuns.js");
 
 // Add or update certificate
@@ -35,9 +36,16 @@ exports.createCertificateAdd = async (req, res) => {
 
 // Get certificate
 exports.getCertificateAdd = async (req, res) => {
-  const certificate = await CertficateAddModel.findOne().lean();
+  const [certificate] = await CertficateAddModel.aggregate([
+    {
+      $addFields: {
+        image: {
+          $concat: [awsUrl, "/", "$image"],
+        },
+      },
+    },
+  ]);
 
-  certificate.image = appendBucketName(certificate.image);
   res.status(StatusCodes.OK).json({
     success: true,
     data: { certificate },

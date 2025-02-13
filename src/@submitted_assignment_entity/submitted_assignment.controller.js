@@ -5,7 +5,7 @@ const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
 const AssignmentModel = require("../@assignment_entity/assignment.model");
 const CourseModel = require("../@course_entity/course.model");
-const { extractURLKey, appendBucketName } = require("../../utils/helperFuns");
+const { extractURLKey, awsUrl } = require("../../utils/helperFuns");
 
 exports.submitAssignment = async (req, res) => {
   const { submittedFileUrls, assignmentId } = req.body;
@@ -68,41 +68,190 @@ exports.getSubmittedAssignments = async (req, res) => {
   const allAssignments = await AssignmentModel.find(query).select("_id");
 
   let query2 = {
-    assignment: { $in: allAssignments.map((assignment) => assignment._id) },
+    assignment: {
+      $in: allAssignments.map((assignment) => assignment._id),
+    },
+    isRevoked: false,
   };
 
   // Filter submitted assignments based on graded or not
   if (isGraded && isGraded === "yes") query2.score = { $gte: 0 };
   if (isGraded && isGraded === "no") query2.score = null;
 
-  const submittedAssignments = await SubmittedAssignmentModel.find(query2)
-    .sort({ submittedAt: -1 })
-    .populate([
-      {
-        path: "assignment",
-        select: "name module submodule",
-        populate: [
+  const submittedAssignmentsPromise = SubmittedAssignmentModel.aggregate([
+    {
+      $match: query2,
+    },
+    {
+      // Recent submission on top
+      $sort: {
+        submittedAt: -1,
+      },
+    },
+    {
+      // Submitted user details
+      $lookup: {
+        from: "users",
+        foreignField: "_id",
+        localField: "user",
+
+        pipeline: [
           {
-            path: "module",
-            select: "name",
-          },
-          {
-            path: "submodule",
-            select: "name",
+            $project: {
+              name: 1,
+              email: 1,
+            },
           },
         ],
+        as: "user",
       },
-      { path: "user", select: "name email" },
-    ])
-    .lean();
+    },
+    {
+      // convert array to obj(single element)
+      $unwind: "$user",
+    },
+    {
+      // Fetch assignment details
+      $lookup: {
+        from: "assignments",
+        foreignField: "_id",
+        localField: "assignment",
 
-  submittedAssignments.forEach((assignment) => {
-    assignment.submittedFileUrls =
-      assignment.submittedFileUrls.map(appendBucketName);
-  });
+        pipeline: [
+          {
+            // Fetch module details , assignment belongs to
+            $lookup: {
+              from: "coursemodules",
+              foreignField: "_id",
+              localField: "module",
+
+              pipeline: [
+                {
+                  $project: {
+                    name: 1,
+                  },
+                },
+              ],
+
+              as: "module",
+            },
+          },
+          {
+            $unwind: "$module",
+          },
+          {
+            // Fetch submodule details , assignment belongs to
+
+            $lookup: {
+              from: "submodules",
+              foreignField: "_id",
+              localField: "submodule",
+
+              pipeline: [
+                {
+                  $project: {
+                    name: 1,
+                  },
+                },
+              ],
+              as: "submodule",
+            },
+          },
+          {
+            $unwind: "$submodule",
+          },
+
+          {
+            $project: {
+              module: 1,
+              submodule: 1,
+              name: 1,
+            },
+          },
+        ],
+        as: "assignment",
+      },
+    },
+    {
+      // convert array to obj(single element)
+      $unwind: "$assignment",
+    },
+
+    {
+      // Fetch revoked submissions for same assignment and user
+      $lookup: {
+        from: "submittedassignments",
+        let: {
+          // Variables storing submitted assignment user and assignment id
+          userId: "$user._id",
+          assignmentId: "$assignment._id",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  {
+                    $eq: ["$user", "$$userId"],
+                  },
+                  {
+                    $eq: ["$assignment", "$$assignmentId"],
+                  },
+                  {
+                    $eq: ["$isRevoked", true],
+                  },
+                ],
+              },
+            },
+          },
+          {
+            // Includes required field
+            $project: {
+              submittedFileUrls: 1,
+              _id: 0,
+            },
+          },
+          {
+            // Convert array to single element
+            $unwind: "$submittedFileUrls",
+          },
+          {
+            // Rename submittedFileUrls to url
+            $replaceRoot: {
+              newRoot: { url: "$submittedFileUrls" },
+            },
+          },
+        ],
+        as: "revokedSubmissions",
+      },
+    },
+    {
+      // Convert revokedSubmissions (mutliple url objects)  to contain only url strings
+      $addFields: {
+        revokedSubmissions: {
+          $map: {
+            input: "$revokedSubmissions",
+            as: "submission",
+            in: {
+              $concat: [awsUrl, "/", "$$submission.url"],
+            },
+          },
+        },
+        submittedFileUrls: {
+          $map: {
+            input: "$submittedFileUrls",
+            as: "url",
+            in: {
+              $concat: [awsUrl, "/", "$$url"],
+            },
+          },
+        },
+      },
+    },
+  ]);
 
   // Fetch submodules of this course for filtering
-  const submodules = await CourseModel.aggregate([
+  const submodulesPromise = CourseModel.aggregate([
     {
       $match: {
         _id: new mongoose.Types.ObjectId(courseId),
@@ -140,9 +289,43 @@ exports.getSubmittedAssignments = async (req, res) => {
     },
   ]);
 
+  const [submittedAssignments, submodules] = await Promise.all([
+    submittedAssignmentsPromise,
+    submodulesPromise,
+  ]);
+
   return res.status(StatusCodes.OK).json({
     success: true,
     data: { submittedAssignments, submodules },
     message: "Assignments fetch successfully",
+  });
+};
+
+// revoke submitted assignments
+exports.revokeAssignment = async (req, res) => {
+  const { id } = req.params;
+
+  const result = await SubmittedAssignmentModel.updateOne(
+    {
+      _id: id,
+    },
+    {
+      isRevoked: true,
+    },
+    { runValidators: true }
+  );
+  // Handle case when no document is found
+  if (result.matchedCount === 0) {
+    throw new NotFoundError("Assignment not found");
+  }
+
+  // Handle case when update did not modify any document
+  if (result.modifiedCount === 0) {
+    throw new BadRequestError("Assignment revokation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    succes: true,
+    message: "Revoked successfully",
   });
 };

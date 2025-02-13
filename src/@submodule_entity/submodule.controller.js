@@ -213,7 +213,6 @@ exports.getResources = async (req, res) => {
       },
     },
   ]);
-  console.log(submodule);
   // const submodule = await SubmoduleModel.findById(id);
   if (!submodule) {
     throw new NotFoundError("Requested submodule may not exists");

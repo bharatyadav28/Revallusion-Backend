@@ -7,6 +7,7 @@ const { NotFoundError } = require("../../errors/index.js");
 const {
   StringToObjectId,
   updateSequence,
+  awsUrl,
 } = require("../../utils/helperFuns.js");
 
 // Add a carousal
@@ -34,10 +35,41 @@ exports.addCarousalData = async (req, res) => {
 
 // Get all carousals
 exports.getCarousals = async (req, res) => {
-  const carousals = await CarousalModel.find()
-    .sort({ sequence: 1 })
-    .populate({ path: "video", select: "title description" })
-    .lean();
+  const carousals = await CarousalModel.aggregate([
+    { $sort: { sequence: 1 } },
+    {
+      $lookup: {
+        from: "videos",
+        localField: "video",
+        foreignField: "_id",
+        as: "video",
+        pipeline: [
+          {
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl + "/" + "$thumbnailUrl"],
+              },
+              videoUrl: {
+                $concat: [awsUrl + "/" + "$videoUrl"],
+              },
+            },
+          },
+
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              thumbnailUrl: 1,
+              videoUrl: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $unwind: "$video",
+    },
+  ]);
 
   res.status(StatusCodes.OK).json({
     success: true,
