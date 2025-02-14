@@ -57,22 +57,57 @@ exports.deleteComment = async (req, res) => {
 
 // Get all comments
 exports.getAllComments = async (req, res) => {
-  const comments = await CommentModel.find().populate([
-    {
-      path: "user",
-      select: "name email ",
-    },
-    {
-      path: "video",
-      select: "title description thumbnailUrl videoUrl",
-    },
+  const { resultPerPage, currentPage, replied } = req.query;
+
+  const limit = Number(resultPerPage) || 8;
+  const page = Number(currentPage) || 1;
+  const skip = (page - 1) * limit;
+
+  let query = {};
+
+  if (typeof replied === "string") {
+    const lowerReplied = replied.toLowerCase(); // Normalize input for comparison
+
+    if (lowerReplied === "yes") {
+      query.reply = { $exists: true, $ne: null };
+    } else if (lowerReplied === "no") {
+      query.$or = [
+        { reply: "" },
+        { reply: null },
+        { reply: { $exists: false } },
+      ];
+    }
+  }
+
+  const commentsPromise = CommentModel.find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .populate([
+      {
+        path: "user",
+        select: "name email ",
+      },
+      {
+        path: "video",
+        select: "title description ",
+      },
+    ]);
+
+  const CommentsCountPromise = CommentModel.countDocuments(query);
+  const [comments, CommentsCount] = await Promise.all([
+    commentsPromise,
+    CommentsCountPromise,
   ]);
+
+  const pagesCount = Math.ceil(CommentsCount / limit) || 1;
 
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Comments fetched successfully",
     data: {
       comments,
+      pagesCount,
     },
   });
 };
