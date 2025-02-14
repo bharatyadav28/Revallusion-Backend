@@ -20,7 +20,6 @@ const CommentSchema = new mongoose.Schema(
     reply: {
       type: String,
       trim: true,
-      required: [true, "Please provide reply"],
     },
     repliedAt: {
       type: Date,

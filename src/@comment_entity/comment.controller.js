@@ -82,7 +82,7 @@ exports.replyComment = async (req, res) => {
   const { id } = req.params;
   const { reply } = req.body;
 
-  //   if (!reply) throw new BadRequestError("Please provide reply");
+  if (!reply) throw new BadRequestError("Please provide reply");
 
   const result = await CommentModel.updateOne(
     {
