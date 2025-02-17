@@ -24,7 +24,7 @@ const sendEmail = async ({ to, subject, html }) => {
 
   // Send email using previously created transporter
   return transporter.sendMail({
-    from: '"Revallusion" <revallsion@gmail.com>',
+    from: '"Ravallusion" <ravallsion@gmail.com>',
     to,
     subject,
     html,

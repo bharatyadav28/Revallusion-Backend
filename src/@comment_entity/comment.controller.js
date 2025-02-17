@@ -57,7 +57,7 @@ exports.deleteComment = async (req, res) => {
 
 // Get all comments
 exports.getAllComments = async (req, res) => {
-  const { resultPerPage, currentPage, replied } = req.query;
+  const { resultPerPage, currentPage, replied, filterByDate } = req.query;
 
   const limit = Number(resultPerPage) || 8;
   const page = Number(currentPage) || 1;
@@ -77,6 +77,16 @@ exports.getAllComments = async (req, res) => {
         { reply: { $exists: false } },
       ];
     }
+  }
+  if (filterByDate) {
+    const filterdDate = new Date(filterByDate); // Convert to Date object
+    const nextDay = new Date(filterdDate);
+    nextDay.setDate(nextDay.getDate() + 1); // Move to next day at 00:00:00
+
+    query.createdAt = {
+      $gte: filterdDate, // Start of the selected day
+      $lt: nextDay, // Before the next day's start
+    };
   }
 
   const commentsPromise = CommentModel.find(query)
