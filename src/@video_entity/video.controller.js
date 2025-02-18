@@ -113,6 +113,7 @@ exports.getIntroductoryVideos = async (req, res) => {
       // Stage 1
       $match: {
         isFree: true,
+        isDeleted: false,
       },
     },
     {

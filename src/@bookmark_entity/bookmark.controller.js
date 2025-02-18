@@ -24,6 +24,11 @@ exports.getAllBookMarks = async (req, res) => {
         as: "video",
         pipeline: [
           {
+            $match: {
+              isDeleted: false,
+            },
+          },
+          {
             $addFields: {
               thumbnailUrl: {
                 $concat: [awsUrl, "/", "$thumbnailUrl"],

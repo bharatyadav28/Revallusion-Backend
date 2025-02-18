@@ -205,7 +205,6 @@ exports.verifyPayment = async (req, res) => {
   }
 
   const frontendDomain = getFrontendDomain(req);
-  console.log("Frontend domain", frontendDomain);
   return res.redirect(`${frontendDomain}/verify-payment`);
 
   // return res.status(StatusCodes.OK).json({

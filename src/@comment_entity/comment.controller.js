@@ -42,7 +42,6 @@ exports.createComment = async (req, res) => {
 // Delete comment
 exports.deleteComment = async (req, res) => {
   const { id } = req.params;
-  console.log("id", id);
 
   const deletedComment = await CommentModel.findByIdAndDelete(id);
   if (!deletedComment) {

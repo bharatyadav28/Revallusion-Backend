@@ -6,6 +6,7 @@ const ModuleSchema = new mongoose.Schema({
     required: [true, "Please enter module name"],
     trim: true,
   },
+  thumbnailUrl: String,
   course: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Course",

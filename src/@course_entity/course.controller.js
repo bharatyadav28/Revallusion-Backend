@@ -65,7 +65,14 @@ exports.getCourse = async (req, res) => {
         foreignField: "course",
         pipeline: [
           //  Select specific modules fields
-          { $project: { _id: 1, name: 1 } },
+          {
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+          { $project: { _id: 1, name: 1, thumbnailUrl: 1 } },
 
           {
             // Fetch course submodules
@@ -404,11 +411,21 @@ exports.getSubscribedPlanCourse = async (req, res) => {
           },
 
           {
+            // Append aws url to thumbnail path
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+
+          {
             $project: {
               _id: 1,
               name: 1,
               videoCount: { $sum: "$submodules.videoCount" },
               submodules: 1,
+              thumbnailUrl: 1,
             },
           },
         ],
