@@ -47,6 +47,12 @@ exports.getAllBookMarks = async (req, res) => {
         ],
       },
     },
+    {
+      // Stage 3: Filter out documents where video array is empty
+      $match: {
+        video: { $ne: [] },
+      },
+    },
 
     {
       // Stage 3: convert video array to obj (Only one video present in array)

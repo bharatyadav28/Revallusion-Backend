@@ -113,7 +113,6 @@ exports.getIntroductoryVideos = async (req, res) => {
       // Stage 1
       $match: {
         isFree: true,
-        isDeleted: false,
       },
     },
     {
@@ -126,7 +125,7 @@ exports.getIntroductoryVideos = async (req, res) => {
           {
             $match: {
               isDeleted: false,
-              isActive: true,
+              // isActive: true,
             },
           },
           {
@@ -594,7 +593,7 @@ exports.deleteAllVideos = async (req, res, next) => {
 exports.getVideoList = async (req, res, next) => {
   const { search, resultPerPage, currentPage } = req.query;
 
-  let query = { isDeleted: false, isActive: true };
+  let query = { isDeleted: false };
   if (search) {
     query.$or = [
       { title: { $regex: search, $options: "i" } },

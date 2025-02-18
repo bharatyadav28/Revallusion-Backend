@@ -45,6 +45,11 @@ exports.getCarousals = async (req, res) => {
         as: "video",
         pipeline: [
           {
+            $match: {
+              isDeleted: false,
+            },
+          },
+          {
             $addFields: {
               thumbnailUrl: {
                 $concat: [awsUrl + "/" + "$thumbnailUrl"],
@@ -66,6 +71,14 @@ exports.getCarousals = async (req, res) => {
         ],
       },
     },
+
+    {
+      // Stage 3: Filter out documents where video array is empty
+      $match: {
+        video: { $ne: [] },
+      },
+    },
+
     {
       $unwind: "$video",
     },
