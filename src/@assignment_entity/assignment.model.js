@@ -2,20 +2,26 @@ const mongoose = require("mongoose");
 
 const AssignmentSchema = new mongoose.Schema(
   {
-    course: {
+    // course: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Course",
+    //   required: [true, "Please provide course id"],
+    // },
+    // module: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "CourseModule",
+    //   required: [true, "Please provide module id"],
+    // },
+    // submodule: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "Submodule",
+    //   required: [true, "Please provide submodule id"],
+    // },
+
+    video: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Course",
-      required: [true, "Please provide course id"],
-    },
-    module: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "CourseModule",
-      required: [true, "Please provide module id"],
-    },
-    submodule: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Submodule",
-      required: [true, "Please provide submodule id"],
+      ref: "Video",
+      required: [true, "Please provide video id"],
     },
 
     name: {
@@ -23,6 +29,7 @@ const AssignmentSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+
     fileUrl: {
       type: String,
       required: true,

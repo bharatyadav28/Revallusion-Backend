@@ -45,6 +45,14 @@ const videoSchema = new mongoose.Schema(
     sequence: {
       type: Number,
     },
+
+    resource: {
+      type: String,
+    },
+    assignment: {
+      type: String,
+    },
+
     // Status flags
     isActive: {
       type: Boolean,

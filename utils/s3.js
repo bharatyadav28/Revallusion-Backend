@@ -46,7 +46,7 @@ exports.s3UploadVideo = async (file, id, access) => {
 exports.generateUploadURL = async (fileExtension = "mp4") => {
   const rawBytes = await randomBytes(16);
   const videoName = rawBytes.toString("hex");
-  let key = `admin-uploads/${videoName}.${fileExtension}`;
+  let key = `admin-uploads/${Date.now().toString()}-${videoName}.${fileExtension}`;
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -149,15 +149,25 @@ exports.s3AdminUploadv4 = async (file) => {
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_BUCKET_REGION,
   });
-  const key = `uploads/users-${Date.now().toString()}-${file.originalname.replaceAll(
+  let buffer = file.buffer;
+  let key = `uploads/users-${Date.now().toString()}-${file.originalname.replaceAll(
     " ",
     ""
   )}`;
+  let contentType = file.mimetype;
+
+  // Check if file is an image and convert it to WebP
+  if (file.mimetype.startsWith("image/")) {
+    buffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+    key = key.replace(/\.[^.]+$/, ".webp"); // Change extension to .webp
+    contentType = "image/webp";
+  }
+
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: key,
-    Body: file.buffer,
-    ContentType: file.mimetype,
+    Body: buffer,
+    ContentType: contentType,
   };
 
   const data = await s3.upload(params).promise();

@@ -317,10 +317,20 @@ exports.updateVideo = async (req, res, next) => {
   }
 
   // New Incoming data
-  let { title, description, thumbnailUrl, course, module, submodule } =
-    req.body;
+  let {
+    title,
+    description,
+    thumbnailUrl,
+    course,
+    module,
+    submodule,
+    resource,
+    assignment,
+  } = req.body;
 
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
+  if (resource) resource = extractURLKey(resource);
+  if (assignment) assignment = extractURLKey(assignment);
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
@@ -331,6 +341,8 @@ exports.updateVideo = async (req, res, next) => {
   if (title) video.title = title;
   if (description) video.description = description;
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
+  if (resource) video.resource = resource;
+  if (assignment) video.assignment = assignment;
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists

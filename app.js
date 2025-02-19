@@ -65,6 +65,9 @@ const SubmittedAssignmentRouter = require("./src/@submitted_assignment_entity/su
 const BookmarkRouter = require("./src/@bookmark_entity/bookmark.index");
 const CommentRouter = require("./src/@comment_entity/comment.index");
 
+const DashboardCarousalRouter = require("./src/@dashboard_carousal_entity/dashboard_carousal.index");
+const DashboardContentRouter = require("./src/@dashboard_content_entity /dashboard_content.index.js");
+
 // Paths
 // Landing page static paths
 app.use("/api/v1/content/hero-section", heroSectionRouter);
@@ -91,6 +94,9 @@ app.use("/api/v1/assignment", assignmentRouter);
 app.use("/api/v1/submitted-assignment", SubmittedAssignmentRouter);
 app.use("/api/v1/bookmark", BookmarkRouter);
 app.use("/api/v1/comment", CommentRouter);
+
+app.use("/api/v1/dashboard/carousal", DashboardCarousalRouter);
+app.use("/api/v1/dashboard/content", DashboardContentRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);
