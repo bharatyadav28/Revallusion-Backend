@@ -44,6 +44,7 @@ exports.getDashboardCarousals = async (req, res) => {
       $project: {
         image: 1,
         sequence: 1,
+        createdAt: 1,
       },
     },
   ]);

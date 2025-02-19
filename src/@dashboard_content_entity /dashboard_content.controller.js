@@ -23,7 +23,7 @@ exports.getDashboardContent = async (req, res) => {
           {
             $addFields: {
               thumbnailUrl: {
-                $concat: [awsUrl + "/" + "$thumbnailUrl"],
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
               },
             },
           },
