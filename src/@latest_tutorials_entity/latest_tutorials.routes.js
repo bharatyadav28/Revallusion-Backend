@@ -13,7 +13,7 @@ const router = express.Router();
 router
   .route("/")
   .post(auth, isAdmin, addVideosToTutorials)
-  .get(auth, isAdmin, getAllLatestTutorials);
+  .get(getAllLatestTutorials);
 
 router
   .route("/:id")

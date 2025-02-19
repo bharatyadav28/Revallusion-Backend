@@ -12,7 +12,7 @@ const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
-router.route("/").post(addFaq).get(auth, isAdmin, getFaqs);
+router.route("/").post(addFaq).get(getFaqs);
 router
   .route("/:id")
   .delete(auth, isAdmin, deleteFaq)
