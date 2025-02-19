@@ -7,12 +7,24 @@ const {
   deletePage,
   getPage,
   updatePage,
+  getPricingPolicy,
+  getTermsAndConditions,
+  getPrivacyPolicy,
+  getRefundPolicy,
+  getAboutUs,
 } = require("./page.controller");
 const { auth, isAdmin } = require("../../middlewares/authentication");
 
 const router = express.Router();
 
 router.route("/").post(auth, isAdmin, addPage).get(getPages);
+
+router.route("/pricing-policy").get(getPricingPolicy);
+router.route("/terms-and-conditions").get(getTermsAndConditions);
+router.route("/privacy-policy").get(getPrivacyPolicy);
+router.route("/refund-policy").get(getRefundPolicy);
+router.route("/about-us").get(getAboutUs);
+
 router
   .route("/:id")
   .delete(auth, isAdmin, deletePage)

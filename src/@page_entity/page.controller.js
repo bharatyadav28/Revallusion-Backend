@@ -72,3 +72,81 @@ exports.deletePage = async (req, res, next) => {
     message: "Page Deleted successfully",
   });
 };
+
+exports.getPricingPolicy = async (req, res, next) => {
+  const page = await PageModel.findOne({ title: "Pricing Policy" }).select({
+    title: 1,
+    description: 1,
+  });
+  if (!page) throw new NotFoundError("Page not found");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { page },
+    message: "Page fetch successfully",
+  });
+};
+
+exports.getTermsAndConditions = async (req, res, next) => {
+  const page = await PageModel.findOne({
+    title: "Terms and Conditions",
+  }).select({
+    title: 1,
+    description: 1,
+  });
+  if (!page) throw new NotFoundError("Page not found");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { page },
+    message: "Page fetch successfully",
+  });
+};
+
+exports.getPrivacyPolicy = async (req, res, next) => {
+  const page = await PageModel.findOne({
+    title: "Privacy Policy",
+  }).select({
+    title: 1,
+    description: 1,
+  });
+  if (!page) throw new NotFoundError("Page not found");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { page },
+    message: "Page fetch successfully",
+  });
+};
+
+exports.getRefundPolicy = async (req, res, next) => {
+  const page = await PageModel.findOne({
+    title: "Refund Policy",
+  }).select({
+    title: 1,
+    description: 1,
+  });
+  if (!page) throw new NotFoundError("Page not found");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { page },
+    message: "Page fetch successfully",
+  });
+};
+
+exports.getAboutUs = async (req, res, next) => {
+  const page = await PageModel.findOne({
+    title: "About Us",
+  }).select({
+    title: 1,
+    description: 1,
+  });
+  if (!page) throw new NotFoundError("Page not found");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    data: { page },
+    message: "Page fetch successfully",
+  });
+};
