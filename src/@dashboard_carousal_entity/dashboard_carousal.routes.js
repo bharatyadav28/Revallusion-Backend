@@ -17,6 +17,6 @@ router
 
 router
   .route("/:id")
-  .put(updateDashboardCarousal)
+  .put(auth, isAdmin, updateDashboardCarousal)
   .delete(auth, isAdmin, deleteDashboardCarousal);
 module.exports = router;

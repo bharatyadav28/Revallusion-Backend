@@ -12,6 +12,9 @@ const router = express.Router();
 
 router.route("/").get(getDashboardContent).post(auth, isAdmin, addSectionName);
 
-router.route("/:id").put(updateSection).delete(deleteSection);
+router
+  .route("/:id")
+  .put(auth, isAdmin, updateSection)
+  .delete(auth, isAdmin, deleteSection);
 
 module.exports = router;
