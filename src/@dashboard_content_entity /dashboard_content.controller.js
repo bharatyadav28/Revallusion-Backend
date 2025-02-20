@@ -1,3 +1,4 @@
+const mongoose = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 
 const DashboardContentModel = require("./dashboard_content.model");
@@ -65,11 +66,11 @@ exports.addSectionName = async (req, res) => {
 // Update section
 exports.updateSection = async (req, res) => {
   const { id } = req.params;
-  const { name, videos } = req.body;
+  const { name } = req.body;
 
   const result = await DashboardContentModel.updateOne(
     { _id: id },
-    { name, videos },
+    { name },
     { runValidators: true }
   );
 
@@ -84,6 +85,61 @@ exports.updateSection = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Section updated successfully",
+  });
+};
+
+// Add Video to section
+exports.addVideoToSection = async (req, res) => {
+  const { id } = req.params;
+
+  const { videos } = req.body;
+
+  const videoObjectIds = videos
+    .map((vid) =>
+      mongoose.Types.ObjectId.isValid(vid)
+        ? { video: new mongoose.Types.ObjectId(vid) }
+        : null
+    )
+    .filter((vid) => vid !== null);
+
+  const result = await DashboardContentModel.findByIdAndUpdate(
+    id,
+    { $push: { videos: { $each: videoObjectIds } } },
+    { new: true, runValidators: true }
+  );
+
+  if (!result) {
+    throw new BadRequestError("Section not found");
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Video added successfully",
+  });
+};
+
+// Remove Video from section
+exports.removeVideoFromSection = async (req, res) => {
+  const { id } = req.params;
+  const { videoId } = req.body;
+
+  const result = await DashboardContentModel.updateOne(
+    { _id: id },
+    { $pull: { videos: { video: videoId } } },
+    { runValidators: true }
+  );
+
+  if (result.matchedCount === 0) {
+    throw new BadRequestError("Section not found");
+  }
+
+  if (result.modifiedCount === 0) {
+    throw new BadRequestError("Video removal failes");
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Video removed successfully",
   });
 };
 
