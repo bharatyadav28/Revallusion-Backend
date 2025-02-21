@@ -24,7 +24,7 @@ router.route("/").get(auth, isAdmin, getVideos).post(auth, isAdmin, saveVideo);
 //NOTE: only for Dev purpose
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
 
-router.route("/list").get(getVideoList);
+router.route("/list").post(auth, isAdmin, getVideoList);
 
 router.route("/introductory-videos").get(getIntroductoryVideos);
 

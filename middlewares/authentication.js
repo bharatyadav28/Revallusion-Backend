@@ -66,7 +66,7 @@ exports.auth = async (req, res, next) => {
   const { accessToken, refreshToken } = req.signedCookies;
 
   if (!accessToken && !refreshToken) {
-    throw new UnauthenticatedError("Not authorized to access this route");
+    throw new UnauthenticatedError("Session expired, please login again");
   }
 
   try {

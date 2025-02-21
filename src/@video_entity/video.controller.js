@@ -605,12 +605,30 @@ exports.deleteAllVideos = async (req, res, next) => {
 exports.getVideoList = async (req, res, next) => {
   const { search, resultPerPage, currentPage } = req.query;
 
-  let query = { isDeleted: false };
+  const { excludeVideos } = req.body;
+
+  let query = {
+    isDeleted: false,
+    $or: [{ module: { $exists: false } }, { module: null }],
+  };
+
+  if (excludeVideos) {
+    query._id = { $nin: excludeVideos };
+  }
+
   if (search) {
-    query.$or = [
-      { title: { $regex: search, $options: "i" } },
-      { description: { $regex: search, $options: "i" } },
+    query.$and = [
+      {
+        $or: [{ module: { $exists: false } }, { module: null }],
+      }, // Preserve module filter
+      {
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      }, // Add search filter
     ];
+    delete query.$or; // Remove top-level $or to avoid conflict
   }
 
   const limit = Number(resultPerPage) || 8;
