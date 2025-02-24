@@ -42,7 +42,7 @@ exports.createOrder = async (req, res) => {
     status: "Active",
   }).populate({
     path: "plan",
-    select: "plan_type validity inr_price",
+    select: "plan_type validity inr_price level",
   });
 
   if (activeOrder) {
@@ -55,13 +55,14 @@ exports.createOrder = async (req, res) => {
       await activeOrder.save();
     } else {
       // Calculate remaining balance from current active order
-      const activePlanType = activeOrder.plan.plan_type;
-      const newPlanType = existingPlan.plan_type;
+      const activePlanLevel = activeOrder.plan.level;
+      const newPlanLevel = existingPlan.level;
 
-      // TODO: Advance dynamic check
+      // Advance dynamic check
       if (
-        activePlanType === newPlanType ||
-        (activePlanType === "Advanced" && newPlanType === "Beginner")
+        activePlanLevel === newPlanLevel ||
+        (activePlanLevel === Number(process.env.ADVANCE_PLAN) &&
+          newPlanLevel === Number(process.env.BEGINNER_PLAN))
       ) {
         throw new BadRequestError("You already have this plan");
       }
