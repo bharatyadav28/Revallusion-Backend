@@ -92,7 +92,15 @@ exports.getCourse = async (req, res) => {
                 },
 
                 // Nested lookup to get videos for each submodule
-                { $project: { _id: 1, name: 1, sequence: 1, thumbnailUrl: 1 } },
+                {
+                  $project: {
+                    _id: 1,
+                    name: 1,
+                    sequence: 1,
+                    thumbnailUrl: 1,
+                    resource: 1,
+                  },
+                },
                 {
                   // Fetch submodule videos
                   $lookup: {
@@ -152,7 +160,6 @@ exports.getCourse = async (req, res) => {
         pipeline: [
           {
             $match: {
-              isActive: true,
               isDeleted: false,
               submodule: null, // Only get videos directly linked to course
             },

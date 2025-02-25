@@ -46,11 +46,9 @@ const videoSchema = new mongoose.Schema(
       type: Number,
     },
 
-    resource: {
-      type: String,
-    },
     assignment: {
       type: String,
+      trim: true,
     },
 
     // Status flags

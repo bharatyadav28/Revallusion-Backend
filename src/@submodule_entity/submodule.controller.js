@@ -13,7 +13,7 @@ const { s3UploadMulti, s3delete } = require("../../utils/s3.js");
 
 // Add a new submodule inside module
 exports.addSubModule = async (req, res) => {
-  const { moduleId, name, thumbnailUrl } = req.body;
+  const { moduleId, name, thumbnailUrl, resource } = req.body;
 
   if (!name) throw new BadRequestError("Please enter submodule name");
 
@@ -26,6 +26,7 @@ exports.addSubModule = async (req, res) => {
   const sequence = await SubmoduleModel.getNextSequence(moduleId);
 
   const thumbnailPath = extractURLKey(thumbnailUrl);
+  resource = extractURLKey(resource);
 
   // Add the submodule
   const submodule = await SubmoduleModel.create({
@@ -33,6 +34,7 @@ exports.addSubModule = async (req, res) => {
     name,
     sequence,
     thumbnailUrl: thumbnailPath,
+    resource,
   });
 
   if (!submodule) {
@@ -47,7 +49,7 @@ exports.addSubModule = async (req, res) => {
 
 // Update a submodule present in a module
 exports.updateSubModule = async (req, res) => {
-  let { name, thumbnailUrl, newModuleId, sequence } = req.body;
+  let { name, thumbnailUrl, newModuleId, sequence, resource } = req.body;
   if (!name) throw new BadRequestError("Please enter submodule name");
 
   const { id: submoduleId } = req.params;
@@ -63,6 +65,10 @@ exports.updateSubModule = async (req, res) => {
     const thumbnailPath = extractURLKey(thumbnailUrl);
 
     submodule.thumbnailUrl = thumbnailPath;
+  }
+  if (resource) {
+    resource = extractURLKey(resource);
+    submodule.resource = resource;
   }
 
   const currentSequence = submodule.sequence;
@@ -184,104 +190,5 @@ exports.updateSubModule = async (req, res) => {
     message: "Submodule updated successfully",
 
     submodule: submodule,
-  });
-};
-
-// Get all resources of a submodule
-exports.getResources = async (req, res) => {
-  const { id } = req.params;
-
-  const [submodule] = await SubmoduleModel.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(id),
-      },
-    },
-
-    {
-      $addFields: {
-        resources: {
-          $map: {
-            input: "$resources", // Loop through resources array
-            as: "resource", // Alias each element as 'resource'
-            in: {
-              _id: "$$resource._id", // Keep original _id
-              url: { $concat: [awsUrl, "/", "$$resource.url"] }, // Append awsUrl
-            },
-          },
-        },
-      },
-    },
-  ]);
-  // const submodule = await SubmoduleModel.findById(id);
-  if (!submodule) {
-    throw new NotFoundError("Requested submodule may not exists");
-  }
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Resources fetched successfully",
-    data: {
-      resources: submodule?.resources || [],
-    },
-  });
-};
-
-// Add a resource inside submodule
-exports.addResource = async (req, res) => {
-  const { id } = req.params;
-
-  if (!req.files || req.files.length === 0) {
-    throw new BadRequestError("Please upload a file");
-  }
-
-  const submodule = await SubmoduleModel.findById(id);
-  if (!submodule) {
-    throw new NotFoundError("Requested submodule may not exists");
-  }
-
-  const results = await s3UploadMulti(req.files);
-
-  const filePaths = results.map((result) => {
-    return { url: result.Key };
-  });
-
-  if (!submodule.resources) submodule.resources = [];
-  submodule.resources.push(...filePaths);
-  await submodule.save();
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Resource added successfully",
-  });
-};
-
-exports.deleteResource = async (req, res) => {
-  const { id, rid } = req.params;
-
-  const submodule = await SubmoduleModel.findById(id);
-  if (!submodule) {
-    throw new NotFoundError("Requested submodule may not exists");
-  }
-  const resources = submodule?.resources || [];
-
-  const resource = resources.find((resource) =>
-    resource._id.equals(StringToObjectId(rid))
-  );
-  if (!resource) {
-    throw new NotFoundError("Requested resource may not exists");
-  }
-
-  // Remove resource from submodule
-  submodule.resources = resources.filter(
-    (resource) => !resource._id.equals(StringToObjectId(rid))
-  );
-  await submodule.save();
-
-  // Delete resource from s3
-  await s3delete(resource.url);
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    message: "Resource deleted successfully",
   });
 };

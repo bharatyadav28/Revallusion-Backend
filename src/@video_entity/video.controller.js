@@ -177,15 +177,33 @@ exports.getVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter video id");
   }
 
-  const videoPromise = await VideoModel.findOne({
-    _id: videoId,
-    isDeleted: false,
-  })
-    .populate({ path: "course", select: "_id isFree plan" })
-    .select("title description thumbnailUrl videoUrl title")
+  // Fetch video
+  const videoPromise = VideoModel.findOne(
+    { _id: videoId, isDeleted: false },
+    {
+      title: 1,
+      description: 1,
+      thumbnailUrl: 1,
+      videoUrl: 1,
+      assignment: 1,
+      course: 1,
+      submodule: 1,
+    }
+  )
+    .populate({
+      path: "course",
+      model: "Course",
+      select: "_id isFree plan",
+    })
+    .populate({
+      path: "submodule",
+      model: "Submodule",
+      select: "resource",
+    })
     .lean();
 
-  const orderPromise = await OrderModel.findOne({
+  // Fetch user subscription
+  const orderPromise = OrderModel.findOne({
     status: "Active",
     user: req.user._id,
   })
@@ -216,10 +234,16 @@ exports.getVideo = async (req, res, next) => {
     }
   }
 
+  // Append bucket name
   video.thumbnailUrl = appendBucketName(video.thumbnailUrl);
   video.videoUrl = appendBucketName(video.videoUrl);
+  if (video.assignment) video.assignment = appendBucketName(video.assignment);
+  if (video?.submodule?.resource) {
+    video.resource = appendBucketName(video.submodule.resource);
+  }
 
-  const { course, ...filteredVideo } = video;
+  // Exclude unnecessary fields
+  const { course, submodule, ...filteredVideo } = video;
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -239,6 +263,7 @@ exports.saveVideo = async (req, res, next) => {
     module,
     submodule,
     duration,
+    assignment,
   } = req.body;
 
   if (!title || !description || !thumbnailUrl || !videoUrl) {
@@ -248,6 +273,7 @@ exports.saveVideo = async (req, res, next) => {
   // Extract keys from url
   if (videoUrl) videoUrl = extractURLKey(videoUrl);
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
+  if (assignment) assignment = extractURLKey(assignment);
 
   const videoData = {
     title,
@@ -258,6 +284,7 @@ exports.saveVideo = async (req, res, next) => {
     module: course && module ? module : null,
     submodule: course && module ? submodule : null,
     duration,
+    assignment,
     sequence: 0,
   };
 

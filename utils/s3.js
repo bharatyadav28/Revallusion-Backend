@@ -66,45 +66,43 @@ exports.s3Uploadv4 = async (file, id) => {
     region: process.env.AWS_BUCKET_REGION,
   });
 
-  if (file?.mimetype?.split("/")[0] === "image") {
-    const key = `uploads/user-${id}/profile/${Date.now().toString()}-${file.originalname.replaceAll(
-      " ",
+  if (!file || !file.mimetype) {
+    throw new Error("Invalid file input");
+  }
+
+  const fileType = file.mimetype.split("/")[0]; // Extract file type (image, video, etc.)
+  const extension = file.originalname.split(".").pop(); // Extract file extension
+  const timestamp = Date.now().toString();
+  let key, body, contentType;
+
+  if (fileType === "image") {
+    // Convert image to WebP for optimization
+    key = `uploads/user-${id}/profile/${timestamp}-${file.originalname.replace(
+      /\s+/g,
       ""
     )}.webp`;
-    const webpImageBuffer = await sharp(file.buffer).webp({ quality: 80 });
-
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: webpImageBuffer,
-      ContentType: "image/webp",
-    };
-    // const key = `uploads/user-${id}/profile/${Date.now().toString()}-${file.originalname.replaceAll(
-    //   " ",
-    //   ""
-    // )}`;
-
-    // const params = {
-    //   Bucket: process.env.AWS_BUCKET_NAME,
-    //   Key: key,
-    //   Body: file.buffer,
-    // };
-
-    const data = await s3.upload(params).promise();
-    data.Location = data.Key;
-    return data;
+    body = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
+    contentType = "image/webp";
   } else {
-    const key = `uploads/user-${id}/pdf/${Date.now().toString()}-invoice.pdf`;
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: file,
-    };
-
-    const data = await s3.upload(params).promise();
-    data.Location = data.Key;
-    return data;
+    // Handle other file types dynamically
+    key = `uploads/user-${id}/${fileType}/${timestamp}-${file.originalname.replace(
+      /\s+/g,
+      ""
+    )}`;
+    body = file.buffer;
+    contentType = file.mimetype; // Use original content type
   }
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    Body: body,
+    ContentType: contentType,
+  };
+
+  const data = await s3.upload(params).promise();
+  data.Location = data.Key;
+  return data;
 };
 
 exports.s3Uploadv4Query = async (file) => {

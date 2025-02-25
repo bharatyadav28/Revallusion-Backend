@@ -1,25 +1,62 @@
 const mongoose = require("mongoose");
+const path = require("path");
 const { StatusCodes } = require("http-status-codes");
 
 const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
 const AssignmentModel = require("../@assignment_entity/assignment.model");
 const CourseModel = require("../@course_entity/course.model");
-const { extractURLKey, awsUrl } = require("../../utils/helperFuns");
+const {
+  extractURLKey,
+  awsUrl,
+  appendBucketName,
+} = require("../../utils/helperFuns");
+const { s3Uploadv4 } = require("../../utils/s3");
 
-exports.submitAssignment = async (req, res) => {
-  const { submittedFileUrls, assignmentId } = req.body;
-  const user = req.user._id;
+exports.uploadAssignmentAnswer = async (req, res) => {
+  // Upload image or document file only
 
-  const filePaths = [];
-  for (let i = 0; i < submittedFileUrls.length; i++) {
-    filePaths.push(extractURLKey(submittedFileUrls[i]));
+  if (!req.file) {
+    throw new BadRequestError("Please upload a file");
   }
 
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (ext !== ".rar") {
+    return res
+      .status(StatusCodes.BAD_REQUEST)
+      .json({ message: "Invalid file type. Only .rar files are allowed!" });
+  }
+
+  // Validate file size
+  if (req.file.size > 50 * 1024 * 1024) {
+    throw new BadRequestError("File size should be less than 50MB");
+  }
+
+  // Get file type
+  result = await s3Uploadv4(req.file, req.user._id);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { fileUrl: appendBucketName(result.key) },
+    message: "File uploaded successfully",
+  });
+};
+
+exports.submitAssignment = async (req, res) => {
+  const { submittedFileUrl, videoId } = req.body;
+
+  if (!videoId) throw new BadRequestError("Please enter video id");
+  if (!submittedFileUrl)
+    throw new BadRequestError("Please enter submitted file url");
+
+  const user = req.user._id;
+
+  const filePath = extractURLKey(submittedFileUrl);
+
   const assignment = await SubmittedAssignmentModel.create({
-    assignment: assignmentId,
+    video: videoId,
     user,
-    submittedFileUrls: filePaths,
+    submittedFileUrl: filePath,
   });
 
   if (!assignment) {

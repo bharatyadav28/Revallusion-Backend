@@ -1,18 +1,20 @@
 const mongoose = require("mongoose");
+const { trim } = require("validator");
 
 const SubmittedAssignmentSchema = new mongoose.Schema({
-  assignment: {
+  video: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Assignment",
-    required: [true, "Please provide assignment id"],
+    ref: "Video",
+    required: [true, "Please provide video id"],
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "User",
     required: [true, "Please provide user id"],
   },
-  submittedFileUrls: {
-    type: [String],
+  submittedFileUrl: {
+    type: String,
+    trim: true,
     required: true,
   },
   score: {
@@ -35,7 +37,7 @@ const SubmittedAssignmentSchema = new mongoose.Schema({
   },
 });
 
-SubmittedAssignmentSchema.index({ assignmentId: 1, userId: 1 });
+SubmittedAssignmentSchema.index({ video: 1, user: 1 });
 
 const SubmittedAssignmentModel = mongoose.model(
   "SubmittedAssignment",
