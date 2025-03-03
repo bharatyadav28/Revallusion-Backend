@@ -83,13 +83,17 @@ videoSchema.statics.getNextSequence = async function ({ course, submodule }) {
     query.submodule = null;
   }
 
-  const maxSequence = await this.findOne(
+  const maxSequenceDoc = await this.findOne(
     query,
     { sequence: 1 },
     { sort: { sequence: -1 } }
   );
 
-  return (maxSequence?.sequence || 0) + 1;
+  const maxSequence = maxSequenceDoc?.sequence || 0;
+
+  const nextSequence = (maxSequence < 0 ? 0 : maxSequence) + 1;
+
+  return nextSequence;
 };
 
 videoSchema.statics.updateVideoSequence = async function (video, sequence) {

@@ -516,7 +516,9 @@ exports.updateActiveStatus = async (req, res, next) => {
     throw new NotFoundError("Video not found");
   }
   if (video.isActive === isActive) {
-    throw new BadRequestError("Video status is already " + isActive);
+    throw new BadRequestError(
+      `Video status is already  ${isActive ? "active" : "inactive"}`
+    );
   }
 
   if (isActive === false) {
