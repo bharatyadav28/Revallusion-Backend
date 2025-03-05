@@ -61,7 +61,6 @@ const courseRouter = require("./src/@course_entity/course.index");
 const courseModuleRouter = require("./src/@course_module_entity/course_module.index");
 const submoduleRouter = require("./src/@submodule_entity/submodule.index");
 const orderRouter = require("./src/@order_entity/order.index");
-const assignmentRouter = require("./src/@assignment_entity/assignment.index");
 const SubmittedAssignmentRouter = require("./src/@submitted_assignment_entity/submitted_assignment.index");
 const BookmarkRouter = require("./src/@bookmark_entity/bookmark.index");
 const CommentRouter = require("./src/@comment_entity/comment.index");
@@ -92,7 +91,6 @@ app.use("/api/v1/course/submodule", submoduleRouter);
 app.use("/api/v1/course", courseRouter);
 
 app.use("/api/v1/order", orderRouter);
-app.use("/api/v1/assignment", assignmentRouter);
 app.use("/api/v1/submitted-assignment", SubmittedAssignmentRouter);
 app.use("/api/v1/bookmark", BookmarkRouter);
 app.use("/api/v1/comment", CommentRouter);
