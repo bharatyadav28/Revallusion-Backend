@@ -4,13 +4,15 @@ const { StatusCodes } = require("http-status-codes");
 
 const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
-const AssignmentModel = require("../@assignment_entity/assignment.model");
+
 const CourseModel = require("../@course_entity/course.model");
+const VideoModel = require("../@video_entity/video.model");
 const {
   extractURLKey,
   awsUrl,
   appendBucketName,
 } = require("../../utils/helperFuns");
+
 const { s3Uploadv4 } = require("../../utils/s3");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
@@ -53,6 +55,15 @@ exports.submitAssignment = async (req, res) => {
 
   const filePath = extractURLKey(submittedFileUrl);
 
+  const alreadySubmittedAssignment = await SubmittedAssignmentModel.findOne({
+    video: videoId,
+    user,
+    isRevoked: false,
+  });
+  if (alreadySubmittedAssignment) {
+    throw new BadRequestError("Assignment already submitted");
+  }
+
   const assignment = await SubmittedAssignmentModel.create({
     video: videoId,
     user,
@@ -66,6 +77,21 @@ exports.submitAssignment = async (req, res) => {
   return res.status(StatusCodes.CREATED).json({
     success: true,
     message: "Assignment submitted successfully",
+  });
+};
+
+exports.hasAlreadySubmittedAssignment = async (req, res) => {
+  const { videoId } = req.params;
+
+  const assignment = await SubmittedAssignmentModel.findOne({
+    video: videoId,
+    user: req.user._id,
+    isRevoked: false,
+  });
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: { video: videoId, hasAlreadySubmitted: assignment ? true : false },
   });
 };
 
@@ -103,11 +129,13 @@ exports.getSubmittedAssignments = async (req, res) => {
   if (moduleId) query.module = moduleId;
   if (submoduleId) query.submodule = submoduleId;
 
-  const allAssignments = await AssignmentModel.find(query).select("_id");
+  const courseVideos = await VideoModel.find(query).select("_id");
+
+  // const allAssignments = await AssignmentModel.find(query).select("_id");
 
   let query2 = {
-    assignment: {
-      $in: allAssignments.map((assignment) => assignment._id),
+    video: {
+      $in: courseVideos.map((video) => video._id),
     },
     isRevoked: false,
   };
@@ -161,9 +189,9 @@ exports.getSubmittedAssignments = async (req, res) => {
     {
       // Fetch assignment details
       $lookup: {
-        from: "assignments",
+        from: "videos",
         foreignField: "_id",
-        localField: "assignment",
+        localField: "video",
 
         pipeline: [
           {
@@ -213,16 +241,16 @@ exports.getSubmittedAssignments = async (req, res) => {
             $project: {
               module: 1,
               submodule: 1,
-              name: 1,
+              title: 1,
             },
           },
         ],
-        as: "assignment",
+        as: "video",
       },
     },
     {
       // convert array to obj(single element)
-      $unwind: "$assignment",
+      $unwind: "$video",
     },
 
     {
@@ -232,7 +260,7 @@ exports.getSubmittedAssignments = async (req, res) => {
         let: {
           // Variables storing submitted assignment user and assignment id
           userId: "$user._id",
-          assignmentId: "$assignment._id",
+          videoId: "$video._id",
         },
         pipeline: [
           {
@@ -243,7 +271,7 @@ exports.getSubmittedAssignments = async (req, res) => {
                     $eq: ["$user", "$$userId"],
                   },
                   {
-                    $eq: ["$assignment", "$$assignmentId"],
+                    $eq: ["$video", "$$videoId"],
                   },
                   {
                     $eq: ["$isRevoked", true],
@@ -255,18 +283,15 @@ exports.getSubmittedAssignments = async (req, res) => {
           {
             // Includes required field
             $project: {
-              submittedFileUrls: 1,
+              submittedFileUrl: 1,
               _id: 0,
             },
           },
+
           {
-            // Convert array to single element
-            $unwind: "$submittedFileUrls",
-          },
-          {
-            // Rename submittedFileUrls to url
+            // Rename submittedFileUrl to url
             $replaceRoot: {
-              newRoot: { url: "$submittedFileUrls" },
+              newRoot: { url: "$submittedFileUrl" },
             },
           },
         ],
@@ -285,14 +310,15 @@ exports.getSubmittedAssignments = async (req, res) => {
             },
           },
         },
-        submittedFileUrls: {
-          $map: {
-            input: "$submittedFileUrls",
-            as: "url",
-            in: {
-              $concat: [awsUrl, "/", "$$url"],
-            },
-          },
+        submittedFileUrl: {
+          // $map: {
+          //   input: "$submittedFileUrl",
+          //   as: "url",
+          //   in: {
+          //     $concat: [awsUrl, "/", "$$url"],
+          //   },
+          // },
+          $concat: [awsUrl, "/", "$submittedFileUrl"],
         },
       },
     },
@@ -366,6 +392,7 @@ exports.revokeAssignment = async (req, res) => {
     },
     {
       isRevoked: true,
+      // score: null,
     },
     { runValidators: true }
   );
