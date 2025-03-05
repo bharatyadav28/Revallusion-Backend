@@ -131,8 +131,6 @@ exports.getSubmittedAssignments = async (req, res) => {
 
   const courseVideos = await VideoModel.find(query).select("_id");
 
-  // const allAssignments = await AssignmentModel.find(query).select("_id");
-
   let query2 = {
     video: {
       $in: courseVideos.map((video) => video._id),
@@ -311,13 +309,6 @@ exports.getSubmittedAssignments = async (req, res) => {
           },
         },
         submittedFileUrl: {
-          // $map: {
-          //   input: "$submittedFileUrl",
-          //   as: "url",
-          //   in: {
-          //     $concat: [awsUrl, "/", "$$url"],
-          //   },
-          // },
           $concat: [awsUrl, "/", "$submittedFileUrl"],
         },
       },

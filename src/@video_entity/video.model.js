@@ -96,52 +96,6 @@ videoSchema.statics.getNextSequence = async function ({ course, submodule }) {
   return nextSequence;
 };
 
-videoSchema.statics.updateVideoSequence = async function (video, sequence) {
-  const session = await mongoose.startSession();
-
-  try {
-    await session.withTransaction(async () => {
-      const oldSequence = video.sequence;
-      const query = {};
-
-      if (video.submodule) {
-        query.submodule = video.submodule;
-      } else if (video.course) {
-        query.course = video.course;
-        query.submodule = null;
-      }
-
-      if (newSequence > oldSequence) {
-        await mongoose.model("Video").updateMany(
-          {
-            ...query,
-            sequence: { $gt: oldSequence, $lte: newSequence },
-          },
-          { $inc: { sequence: -1 } },
-          { session }
-        );
-      } else if (newSequence < oldSequence) {
-        await mongoose.model("Video").updateMany(
-          {
-            ...query,
-            sequence: { $gte: newSequence, $lt: oldSequence },
-          },
-          { $inc: { sequence: 1 } },
-          { session }
-        );
-      }
-
-      video.sequence = newSequence;
-      await video.save({ session });
-    });
-
-    await session.endSession();
-  } catch (error) {
-    await session.endSession();
-    throw error;
-  }
-};
-
 const VideoModel = mongoose.model("Video", videoSchema);
 
 module.exports = VideoModel;

@@ -147,6 +147,7 @@ exports.getCourseProgress = async (req, res) => {
         lastPosition: 1,
         percentageWatched: 1,
         isCompleted: 1,
+        watchedDuration: 1,
       },
     },
   ]);

@@ -10,10 +10,12 @@ const {
   awsUrl,
 } = require("../../utils/helperFuns.js");
 const { s3UploadMulti, s3delete } = require("../../utils/s3.js");
+const VideoModel = require("../@video_entity/video.model.js");
 
 // Add a new submodule inside module
 exports.addSubModule = async (req, res) => {
-  const { moduleId, name, thumbnailUrl, resource } = req.body;
+  const { moduleId, name, thumbnailUrl } = req.body;
+  let { resource } = req.body;
 
   if (!name) throw new BadRequestError("Please enter submodule name");
 
@@ -190,5 +192,68 @@ exports.updateSubModule = async (req, res) => {
     message: "Submodule updated successfully",
 
     submodule: submodule,
+  });
+};
+
+// Delete submodule
+exports.deleteSubModule = async (req, res) => {
+  const submoduleId = req.params.id;
+
+  const targetSubmodule = await SubmoduleModel.findById(submoduleId);
+  if (!targetSubmodule) {
+    throw new NotFoundError("Targeted submodule may not exists");
+  }
+
+  const module = targetSubmodule.module;
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const updateSubmoduleVideosPromise = VideoModel.updateMany(
+        {
+          submodule: submoduleId,
+        },
+        {
+          $set: { course: null, module: null, submodule: null },
+        },
+        {
+          session,
+          // runValidators: true,
+        }
+      );
+
+      // Decrement sequence of all submodules having greater sequence than submodule being deleted
+      const adjustSubmodulesSequencePromise = SubmoduleModel.updateMany(
+        {
+          module,
+          sequence: { $gt: targetSubmodule.sequence },
+        },
+        {
+          $inc: { sequence: -1 },
+        },
+        {
+          // runValidators: true,
+          session,
+        }
+      );
+
+      const deleteSubmodulePromise = targetSubmodule.deleteOne({ session });
+
+      await Promise.all([
+        updateSubmoduleVideosPromise,
+        adjustSubmodulesSequencePromise,
+        deleteSubmodulePromise,
+      ]);
+    });
+
+    await session.endSession();
+  } catch (error) {
+    await session.endSession();
+    throw error;
+  }
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Submodule deleted successfully",
   });
 };
