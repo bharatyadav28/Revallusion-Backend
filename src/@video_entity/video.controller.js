@@ -459,21 +459,24 @@ exports.deleteVideo = async (req, res, next) => {
     throw new BadRequestError("Video not found");
   }
 
-  if (video.course) {
-    const session = await mongoose.startSession();
+  const session = await mongoose.startSession();
 
-    try {
-      await session.withTransaction(async () => {
-        // Update sequences in old location
+  try {
+    await session.withTransaction(async () => {
+      // Update sequences in old location
+
+      let updateSequencePromise = null;
+
+      if (video.course) {
         const query = {};
         if (video.submodule) {
           query.submodule = video.submodule;
-        } else if (video.course) {
+        } else {
           query.course = video.course;
           query.submodule = null;
         }
 
-        await VideoModel.updateMany(
+        updateSequencePromise = VideoModel.updateMany(
           {
             ...query,
             sequence: { $gt: video.sequence },
@@ -481,23 +484,33 @@ exports.deleteVideo = async (req, res, next) => {
           { $inc: { sequence: -1 } },
           { session }
         );
+      }
 
-        // Update video with new location and sequence
-        video.course = null;
-        video.submodule = null;
-        video.module = null;
-        video.sequence = -1;
-        video.isDeleted = true;
-        video.deletedAt = Date.now();
+      const softDeleteVideoPromise = VideoModel.updateOne(
+        { _id: videoId },
+        {
+          $set: {
+            isDeleted: true,
+            deletedAt: Date.now(),
+            course: null,
+            submodule: null,
+            module: null,
+          },
+        },
+        { session }
+      );
 
-        await video.save({ session });
-      });
+      const allPromises = [softDeleteVideoPromise];
+      if (updateSequencePromise) {
+        allPromises.push(updateSequencePromise);
+      }
+      await Promise.all(allPromises);
+    });
 
-      await session.endSession();
-    } catch (error) {
-      await session.endSession();
-      throw error;
-    }
+    await session.endSession();
+  } catch (error) {
+    await session.endSession();
+    throw error;
   }
 
   res.status(StatusCodes.OK).json({
