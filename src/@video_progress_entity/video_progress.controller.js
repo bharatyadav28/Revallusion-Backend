@@ -121,6 +121,11 @@ exports.getCourseProgress = async (req, res) => {
         user: new mongoose.Types.ObjectId(userId),
       },
     },
+    {
+      $sort: {
+        updatedAt: -1,
+      },
+    },
 
     {
       $lookup: {
