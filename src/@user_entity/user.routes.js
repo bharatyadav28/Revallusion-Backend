@@ -8,13 +8,9 @@ const {
   switchDevice,
   googleAuth,
   sendMe,
-  getHomeContent,
-  getIntroductoryVideos,
 } = require("./user.controller");
 
 const router = express.Router();
-
-router.route("/home").get(getHomeContent);
 
 router.route("/signin").post(signin);
 router.route("/verify-user").post(verifyUser);

@@ -271,39 +271,44 @@ exports.getCourseTitle = async (req, res) => {
 // Fetch Subscribed course data
 exports.getSubscribedPlanCourse = async (req, res) => {
   const userId = req.user._id;
+  const userRole = req.user.role;
   const { planId } = req.params;
 
-  // Access user plan
-  const orderPromise = OrderModel.findOne({
-    user: userId,
-    status: "Active",
-  }).populate({
-    path: "plan",
-    select: "_id level",
-  });
+  if (userRole !== "admin") {
+    // Access user plan
+    const orderPromise = OrderModel.findOne({
+      user: userId,
+      status: "Active",
+    }).populate({
+      path: "plan",
+      select: "_id level",
+    });
 
-  const requestedPlanPromise = PlanModel.findById(planId);
+    const requestedPlanPromise = PlanModel.findById(planId);
 
-  const [order, requestedPlan] = await Promise.all([
-    orderPromise,
-    requestedPlanPromise,
-  ]);
+    const [order, requestedPlan] = await Promise.all([
+      orderPromise,
+      requestedPlanPromise,
+    ]);
 
-  if (!order) {
-    throw new NotFoundError("Please subscribe to a plan");
-  }
-  if (!requestedPlan) {
-    throw new NotFoundError("Requested plan may not exists");
-  }
+    if (!order) {
+      throw new NotFoundError("Please subscribe to a plan");
+    }
+    if (!requestedPlan) {
+      throw new NotFoundError("Requested plan may not exists");
+    }
 
-  const currentPlanLevel = order.plan.level;
+    const currentPlanLevel = order.plan.level;
 
-  // Check if user has access to this course
-  if (
-    currentPlanLevel === Number(process.env.BEGINNER_PLAN) &&
-    requestedPlan.level === Number(process.env.ADVANCE_PLAN)
-  ) {
-    throw new BadRequestError("Please upgrade your plan to access this course");
+    // Check if user has access to this course
+    if (
+      currentPlanLevel === Number(process.env.BEGINNER_PLAN) &&
+      requestedPlan.level === Number(process.env.ADVANCE_PLAN)
+    ) {
+      throw new BadRequestError(
+        "Please upgrade your plan to access this course"
+      );
+    }
   }
 
   const [courseData] = await courseModel.aggregate([

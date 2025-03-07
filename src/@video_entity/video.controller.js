@@ -173,6 +173,8 @@ exports.getIntroductoryVideos = async (req, res) => {
 // Fetch a single video
 exports.getVideo = async (req, res, next) => {
   const videoId = req.params.id;
+  const userRole = req?.user?.role;
+
   if (!videoId) {
     throw new BadRequestError("Please enter video id");
   }
@@ -216,7 +218,7 @@ exports.getVideo = async (req, res, next) => {
     throw new BadRequestError("Requested video may not exists");
   }
 
-  if (!video?.course?.isFree) {
+  if (userRole !== "admin" && !video?.course?.isFree) {
     // Subscription check i.e video is not free
 
     if (!order) {

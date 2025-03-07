@@ -30,7 +30,7 @@ const validateSession = async ({ user, deviceId, refreshToken }) => {
 
 // Attach user details (token) to req object
 const attachUserToReq = (req, user) => {
-  req.user = { _id: user._id };
+  req.user = { _id: user._id, role: user.role };
   return;
 };
 
@@ -75,10 +75,10 @@ exports.auth = async (req, res, next) => {
       type: "access",
     });
 
-    attachUserToReq(req, accessTokenpayload.user);
-
     const userId = accessTokenpayload.user._id;
     const existingUser = await getExistingUser(userId);
+
+    attachUserToReq(req, existingUser);
 
     const deviceId = generateDeviceId(req);
 

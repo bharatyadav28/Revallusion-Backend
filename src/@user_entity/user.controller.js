@@ -1,13 +1,5 @@
 const StatusCodes = require("http-status-codes");
 
-const HeroSectionModel = require("../@hero_section_entity/heroSection.model");
-const CarousalModel = require("../@carousal_entity/carousal.model");
-const LatestTutorialsModel = require("../@latest_tutorials_entity/latest_tutorials.model");
-const ModuleModel = require("../@module_entity/module.model");
-const PlanModel = require("../@plan_entity/plan.model");
-const MentorModel = require("../@mentor_entity/mentor.model");
-const CertficateAddModel = require("../@certificate_add_entity/certificateAdd.model");
-const FaqModel = require("../@faq_entity/faq.model");
 const {
   BadRequestError,
   NotFoundError,
@@ -30,101 +22,7 @@ const {
   filterUserData,
 } = require("../../utils/helperFuns.js");
 const OTPManager = require("../../utils/OTPManager.js");
-const { appendBucketName, awsUrl } = require("../../utils/helperFuns.js");
 const OrderModel = require("../@order_entity/order.model.js");
-
-//  User's home page content
-exports.getHomeContent = async (req, res, next) => {
-  // Queries
-  const heroSection = HeroSectionModel.findOne();
-  const carousal = CarousalModel.find()
-    .sort({ sequence: 1 })
-    .populate({
-      path: "video",
-      select: "title description thumbnailUrl videoUrl",
-    })
-    .lean();
-
-  const latestTutorials = LatestTutorialsModel.find()
-    .sort({ sequence: 1 })
-    .populate({
-      path: "video",
-      select: "title description thumbnailUrl videoUrl",
-    })
-    .lean();
-  const modules = ModuleModel.find();
-  const plans = PlanModel.find();
-  const mentors = MentorModel.find().select("-curriculum");
-  const curriculum = MentorModel.findOne().select("curriculum");
-  const certificate = CertficateAddModel.findOne().lean();
-  const faqs = FaqModel.find();
-  const mentor = await MentorModel.findOne();
-
-  // Fetching all data
-  const data = await Promise.all([
-    heroSection,
-    carousal,
-    latestTutorials,
-    modules,
-    plans,
-    mentors,
-    curriculum,
-    certificate,
-    faqs,
-    mentor,
-  ]);
-
-  // Append bucket name to image
-  const getCertificate = (certificate) => {
-    const imagePath = certificate?.image;
-    if (!imagePath) return certificate;
-    return { ...certificate, image: appendBucketName(imagePath) };
-  };
-
-  // Append bucket name to videos and thumbnail
-  const generateFullURLs = (data) => {
-    let result = [];
-    if (data) {
-      result = data?.map((item) => {
-        return {
-          sequence: item.sequence,
-          video: {
-            ...item.video,
-            thumbnailUrl: appendBucketName(item.video.thumbnailUrl),
-            videoUrl: appendBucketName(item.video.videoUrl),
-          },
-        };
-      });
-    }
-    return result;
-  };
-
-  // Append bucket name to curriculum url
-  const generateCurriculumUrl = (data) => {
-    let curricullum = "";
-    if (data && data?.curriculum) {
-      curricullum = appendBucketName(data?.curriculum);
-    }
-    return curricullum;
-  };
-
-  res.status(StatusCodes.OK).json({
-    success: true,
-    data: {
-      heroSection: data[0],
-      carousal: generateFullURLs(data[1]),
-      latestTutorials: generateFullURLs(data[2]),
-      modules: data[3],
-      plans: data[4],
-      mentors: data[5],
-      curriculum: generateCurriculumUrl(data[6]),
-      certificate: getCertificate(data[7]),
-      faqs: data[8],
-      mentor: data[9],
-    },
-    message: "Home content fetch successfully",
-  });
-};
 
 // send auth user details
 exports.sendMe = async (req, res) => {
