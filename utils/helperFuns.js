@@ -125,3 +125,17 @@ exports.getFrontendDomain = (req) => {
 
   return `${protocol}://${host}`;
 };
+
+exports.isoToReadable = (iso) => {
+  if (!iso) {
+    return null;
+  }
+  const d = new Date(iso);
+  const month = d.getMonth() + 1; // Month is zero-indexed
+  const day = d.getDate();
+  const year = d.getFullYear();
+
+  return `${day < 10 ? "0" + day : day}/${
+    month < 10 ? "0" + month : month
+  }/${year}`;
+};

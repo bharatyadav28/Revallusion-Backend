@@ -77,10 +77,9 @@ exports.s3Uploadv4 = async (file, id) => {
 
   if (fileType === "image") {
     // Convert image to WebP for optimization
-    key = `uploads/user-${id}/profile/${timestamp}-${file.originalname.replace(
-      /\s+/g,
-      ""
-    )}.webp`;
+    key = `uploads/user-${id}/profile/${timestamp}-${file.originalname
+      .replace(/\.[^.]+$/, ".webp")
+      .replaceAll(" ", "")}`;
     body = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
     contentType = "image/webp";
   } else {

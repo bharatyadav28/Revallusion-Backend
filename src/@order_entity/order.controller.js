@@ -11,6 +11,7 @@ const OrderModel = require("./order.model");
 const {
   StringToObjectId,
   getFrontendDomain,
+  isoToReadable,
 } = require("../../utils/helperFuns");
 const { default: mongoose } = require("mongoose");
 
@@ -229,5 +230,46 @@ exports.hasSubscription = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     success: true,
     data: { hasSubscription },
+  });
+};
+
+// User subscription details
+exports.mySubscription = async (req, res) => {
+  const userId = req.user._id;
+
+  let hasSubscription = false;
+  let subscriptionDetails = null;
+
+  const activeOrder = await OrderModel.findOne({
+    user: userId,
+    status: "Active",
+  }).populate({ path: "plan", select: "plan_type" });
+
+  if (activeOrder) {
+    hasSubscription = true;
+
+    const planType = activeOrder.plan.planType;
+    const paidOn = isoToReadable(activeOrder.start_date);
+
+    const today = new Date();
+    const planExpiryDate = activeOrder.expiry_date;
+    const remainingDays = Math.floor(
+      (planExpiryDate - today) / (1000 * 60 * 60 * 24)
+    );
+
+    subscriptionDetails = {
+      planType,
+      paidOn,
+      remainingDays,
+    };
+  }
+
+  return res.status(StatusCodes.OK).json({
+    succes: true,
+    message: "Subscription details fetched successfully",
+    data: {
+      hasSubscription,
+      subscriptionDetails,
+    },
   });
 };

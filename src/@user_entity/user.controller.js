@@ -20,29 +20,34 @@ const {
   getExistingUser,
   getTokenPayload,
   filterUserData,
+  appendBucketName,
 } = require("../../utils/helperFuns.js");
 const OTPManager = require("../../utils/OTPManager.js");
 const OrderModel = require("../@order_entity/order.model.js");
+const { s3Uploadv4 } = require("../../utils/s3.js");
 
 // send auth user details
 exports.sendMe = async (req, res) => {
   const userId = req.user._id;
 
-  const user = await userModel
+  const userPromise = userModel
     .findOne({ _id: userId, isDeleted: false })
-    .select("_id name email mobile role isEmailVerified isMobileVerified")
+    .select("_id name email mobile role isEmailVerified avatar")
     .lean();
 
-  let hasSubscription = false;
+  const orderPromise = OrderModel.exists({
+    user: userId,
+    status: "Active",
+  });
 
-  if (user.role !== "admin") {
-    const order = await OrderModel.findOne({
-      user: userId,
-      status: "Active",
-    });
+  const [user, order] = await Promise.all([userPromise, orderPromise]);
 
-    if (order) hasSubscription = true;
+  if (user.avatar) {
+    user.avatar = appendBucketName(user.avatar);
   }
+
+  let hasSubscription = false;
+  if (order) hasSubscription = true;
 
   res.status(StatusCodes.OK).json({
     success: true,
@@ -350,5 +355,120 @@ exports.logout = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Logout successfully",
+  });
+};
+
+exports.updateAvatar = async (req, res) => {
+  const userId = req.user._id;
+  const file = req.file;
+
+  if (!file || !file?.mimetype.split("/")[0] === "image") {
+    throw new BadRequestError("Please upload an image");
+  }
+
+  const result = await s3Uploadv4(file, userId);
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      avatar: result.Key,
+    },
+    {
+      runValidators: true,
+      new: true,
+    }
+  );
+
+  if (!user) {
+    throw new BadRequestError("Profile image updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Avatar updated successfully",
+    data: {
+      avatar: appendBucketName(result.key),
+    },
+  });
+};
+
+exports.updateName = async (req, res) => {
+  const userId = req.user._id;
+  const { name } = req.body;
+
+  if (!name) {
+    throw new BadRequestError("Please enter name");
+  }
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      name,
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!user) {
+    throw new BadRequestError("Name updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Name updated successfully",
+    data: {
+      name: user.name,
+    },
+  });
+};
+
+exports.updateMobile = async (req, res) => {
+  const userId = req.user._id;
+  const { mobile } = req.body;
+
+  if (!mobile) {
+    throw new BadRequestError("Please enter phone number");
+  }
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      mobile,
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!user) {
+    throw new BadRequestError("Phone number updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Phone number updated successfully",
+    data: {
+      mobile: user.mobile,
+    },
+  });
+};
+
+exports.deleteAccount = async (req, res) => {
+  const userId = req.user._id;
+
+  // const deletedAccount = await userModel.findByIdAndDelete(userId);
+  const deletedAccount = await userModel.findByIdAndUpdate(userId, {
+    isDeleted: true,
+  });
+  if (!deletedAccount) {
+    throw new BadRequestError("Account deletion failed.");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Account deleted successfully",
   });
 };

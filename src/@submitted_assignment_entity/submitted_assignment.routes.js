@@ -8,6 +8,7 @@ const {
   revokeAssignment,
   uploadAssignmentAnswer,
   hasAlreadySubmittedAssignment,
+  subscribedCourseAssignments,
 } = require("./submitted_assignment.controller");
 const { upload } = require("../../utils/s3");
 
@@ -26,5 +27,9 @@ router.route("/course/:id").get(auth, isAdmin, getSubmittedAssignments);
 router
   .route("/already-submitted/video/:videoId")
   .get(auth, hasAlreadySubmittedAssignment);
+
+router
+  .route("/subscribed-course-assignments")
+  .get(auth, subscribedCourseAssignments);
 
 module.exports = router;

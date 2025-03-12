@@ -7,6 +7,7 @@ const SubmittedAssignmentModel = require("./submitted_assignment.model");
 
 const CourseModel = require("../@course_entity/course.model");
 const VideoModel = require("../@video_entity/video.model");
+const OrderModel = require("../@order_entity/order.model");
 const {
   extractURLKey,
   awsUrl,
@@ -14,6 +15,7 @@ const {
 } = require("../../utils/helperFuns");
 
 const { s3Uploadv4 } = require("../../utils/s3");
+const PlanModel = require("../@plan_entity/plan.model");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
   // Upload image or document file only
@@ -400,5 +402,201 @@ exports.revokeAssignment = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     succes: true,
     message: "Revoked successfully",
+  });
+};
+
+// Fetch all assigments of subscribed course along with all status
+exports.subscribedCourseAssignments = async (req, res) => {
+  const userId = req.user._id;
+
+  // Access current plan level
+  const order = await OrderModel.findOne({
+    user: userId,
+    status: "Active",
+  }).populate({ path: "plan", select: "level" });
+  if (!order) {
+    throw new NotFoundError("No active subscription exists");
+  }
+
+  const activePlanLevel = order.plan.level;
+  let coveredCourseIds = [];
+
+  // Fetch all course id having plan level less than or equal to current
+  if (activePlanLevel > 1) {
+    const [coveredCourses] = await PlanModel.aggregate([
+      {
+        $match: {
+          level: {
+            $lte: activePlanLevel,
+          },
+        },
+      },
+      {
+        $lookup: {
+          from: "courses",
+          foreignField: "plan",
+          localField: "_id",
+          as: "course",
+          pipeline: [
+            {
+              $project: {
+                _id: 1,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $unwind: { path: "$course", preserveNullAndEmptyArrays: true },
+      },
+      {
+        $group: {
+          _id: null,
+          courseIds: { $push: "$course._id" },
+        },
+      },
+      {
+        $project: {
+          courseIds: 1,
+          _id: 0,
+        },
+      },
+    ]);
+
+    coveredCourseIds = coveredCourses?.courseIds;
+  }
+
+  // Fetch all assigments with all progress info
+  const assigments = await VideoModel.aggregate([
+    {
+      $match: {
+        course: {
+          $in: coveredCourseIds,
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "coursemodules",
+        localField: "module",
+        foreignField: "_id",
+        as: "module",
+        pipeline: [
+          {
+            $project: {
+              _id: 1,
+              name: 1,
+            },
+          },
+        ],
+      },
+    },
+
+    {
+      $set: { module: { $arrayElemAt: ["$module", 0] } },
+    },
+    {
+      $lookup: {
+        from: "videoprogresses",
+        localField: "_id",
+        foreignField: "video",
+        as: "videoProgress",
+        pipeline: [
+          {
+            $match: {
+              user: userId,
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              isCompleted: 1,
+              percentageWatched: 1,
+            },
+          },
+        ],
+      },
+    },
+
+    {
+      $set: {
+        videoProgress: {
+          $arrayElemAt: ["$videoProgress", 0],
+        },
+      },
+    },
+
+    {
+      $lookup: {
+        from: "submittedassignments",
+        localField: "_id",
+        foreignField: "video",
+        as: "submittedAssignment",
+        pipeline: [
+          {
+            $match: {
+              user: userId,
+              isRevoked: false,
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              score: 1,
+              submittedAt: 1,
+            },
+          },
+        ],
+      },
+    },
+    {
+      $set: {
+        submittedAssignment: {
+          $arrayElemAt: ["$submittedAssignment", 0],
+        },
+      },
+    },
+
+    {
+      $group: {
+        _id: "$module._id",
+        moduleName: { $first: "$module.name" },
+
+        videos: {
+          $push: {
+            _id: "$_id",
+            title: "$title",
+            percentageWatched: {
+              $ifNull: ["$videoProgress.percentageWatched", 0],
+            },
+            isCompleted: {
+              $ifNull: ["$videoProgress.isCompleted", false],
+            },
+
+            score: {
+              $ifNull: ["$submittedAssignment.score", null],
+            },
+
+            hasSubmitted: {
+              $cond: {
+                if: {
+                  $gt: ["$submittedAssignment.submittedAt", null],
+                },
+                then: true,
+                else: false,
+              },
+            },
+          },
+        },
+      },
+    },
+  ]);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Assignments fetched successfully",
+    data: {
+      assigments,
+    },
   });
 };
