@@ -1,6 +1,6 @@
 const express = require("express");
 
-const { auth } = require("../../middlewares/authentication");
+const { auth, isAdmin } = require("../../middlewares/authentication");
 const {
   signin,
   logout,

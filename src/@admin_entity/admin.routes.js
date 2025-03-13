@@ -8,6 +8,11 @@ const {
   uploadFile,
   staffSignin,
   createStaff,
+  getUsers,
+  userDetails,
+  createUser,
+  updateUser,
+  deleteUser,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 const { sendMe } = require("../@user_entity/user.controller");
@@ -30,5 +35,15 @@ router
 
 router.route("/staff/sign-up").post(auth, isAdmin, createStaff);
 router.route("/staff/sign-in").post(staffSignin);
+
+router
+  .route("/users")
+  .get(auth, isAdmin, getUsers)
+  .post(auth, isAdmin, createUser);
+router
+  .route("/users/:id")
+  .get(auth, isAdmin, userDetails)
+  .put(auth, isAdmin, updateUser)
+  .delete(auth, isAdmin, deleteUser);
 
 module.exports = router;

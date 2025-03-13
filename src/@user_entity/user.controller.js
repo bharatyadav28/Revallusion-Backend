@@ -25,6 +25,7 @@ const {
 const OTPManager = require("../../utils/OTPManager.js");
 const OrderModel = require("../@order_entity/order.model.js");
 const { s3Uploadv4 } = require("../../utils/s3.js");
+const { default: mongoose } = require("mongoose");
 
 // send auth user details
 exports.sendMe = async (req, res) => {
@@ -469,6 +470,7 @@ exports.deleteAccount = async (req, res) => {
   // const deletedAccount = await userModel.findByIdAndDelete(userId);
   const deletedAccount = await userModel.findByIdAndUpdate(userId, {
     isDeleted: true,
+    deletedAt: new Date(),
   });
   if (!deletedAccount) {
     throw new BadRequestError("Account deletion failed.");

@@ -19,8 +19,6 @@ const { default: mongoose } = require("mongoose");
 exports.createOrder = async (req, res) => {
   const { plan } = req.body;
   const userId = req?.user?._id;
-  // ||
-  // (process.env.NODE_ENV !== "production" ? "67a2fc5347f7bddfc21c6408" : null);
 
   const user = await UserModel.findById(userId);
   if (!user)
@@ -96,7 +94,6 @@ exports.createOrder = async (req, res) => {
     currency: "INR",
   };
   const order = await instance.orders.create(options);
-  //   console.log("Order: ", order);
 
   // Save order to database
   const query = {
