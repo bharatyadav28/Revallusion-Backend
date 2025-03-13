@@ -29,6 +29,9 @@ const { s3Uploadv4 } = require("../../utils/s3.js");
 // send auth user details
 exports.sendMe = async (req, res) => {
   const userId = req.user._id;
+  const role = req.user.role;
+
+  if (role !== "user") throw new BadRequestError("Only end users can access");
 
   const userPromise = userModel
     .findOne({ _id: userId, isDeleted: false })
@@ -250,6 +253,10 @@ exports.updateSessionAndCreateTokens = async ({
   if (existingSessionIndex >= 0) {
     user.activeSessions[existingSessionIndex] = sessionInfo;
   } else {
+    if (user.role !== "user" && user.activeSessions.length >= 5) {
+      // Only 5 active logins for admin/staff
+      user.activeSessions.shift();
+    }
     user.activeSessions.push(sessionInfo);
   }
   await user.save();

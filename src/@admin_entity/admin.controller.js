@@ -140,3 +140,64 @@ exports.uploadFile = async (req, res) => {
     message: "Image uploaded successfully",
   });
 };
+
+exports.createStaff = async (req, res) => {
+  const { email, password } = req.body;
+
+  const staffUser = await userModel.create({
+    email,
+    password,
+    name: "Staff",
+    isEmailVerified: true,
+    role: "staff",
+  });
+  if (!staffUser) {
+    throw new BadRequestError("Staff user creation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Staff user created successfully",
+  });
+};
+
+exports.staffSignin = async (req, res) => {
+  const { email, password, keepMeSignedIn } = req.body;
+
+  // Check required fields
+  if (!email) {
+    throw new BadRequestError("Please enter email");
+  }
+  if (!password) {
+    throw new BadRequestError("Please enter password");
+  }
+
+  let query = { email: email, isDeleted: false, role: "staff" };
+  let user = await userModel.findOne(query).select("+password");
+
+  if (!user) {
+    throw new NotFoundError("Incorrect email or password");
+  }
+
+  const isMatchPassword = await user.comparePassword(password);
+  if (!isMatchPassword) {
+    throw new BadRequestError("Invalid Password");
+  }
+
+  await updateSessionAndCreateTokens({
+    req,
+    res,
+    user,
+    deviceId: generateDeviceId(req),
+    ua: getDeviceData(req),
+    keepMeSignedIn: keepMeSignedIn || false,
+  });
+
+  const userData = filterUserData(user);
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Signin successfully",
+    data: { user: userData },
+  });
+};

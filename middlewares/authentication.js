@@ -129,3 +129,13 @@ exports.isAdmin = async (req, res, next) => {
 
   return next();
 };
+
+exports.isStaff = async (req, res, next) => {
+  const user = await userModel.findById(req.user._id);
+
+  if (!user || user.role !== "staff") {
+    throw new UnAuthorizedError("Not authorized to access this route");
+  }
+
+  return next();
+};

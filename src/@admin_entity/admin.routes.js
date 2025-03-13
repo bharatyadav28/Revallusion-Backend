@@ -6,6 +6,8 @@ const {
   adminUpdateProfile,
   uploadImage,
   uploadFile,
+  staffSignin,
+  createStaff,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 const { sendMe } = require("../@user_entity/user.controller");
@@ -25,5 +27,8 @@ router
 router
   .route("/upload-file")
   .post(auth, isAdmin, upload.single("file"), uploadFile);
+
+router.route("/staff/sign-up").post(auth, isAdmin, createStaff);
+router.route("/staff/sign-in").post(staffSignin);
 
 module.exports = router;

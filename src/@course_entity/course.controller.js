@@ -274,7 +274,7 @@ exports.getSubscribedPlanCourse = async (req, res) => {
   const userRole = req.user.role;
   const { planId } = req.params;
 
-  if (userRole !== "admin") {
+  if (userRole !== "staff") {
     // Access user plan
     const orderPromise = OrderModel.findOne({
       user: userId,
