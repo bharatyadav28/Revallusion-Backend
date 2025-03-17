@@ -218,7 +218,7 @@ exports.getVideo = async (req, res, next) => {
     throw new BadRequestError("Requested video may not exists");
   }
 
-  if (userRole !== "admin" && !video?.course?.isFree) {
+  if (userRole !== "staff" && !video?.course?.isFree) {
     // Subscription check i.e video is not free
 
     if (!order) {
