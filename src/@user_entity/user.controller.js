@@ -161,12 +161,12 @@ exports.googleAuth = async (req, res) => {
       user = await userModel.create({
         email,
         name,
-        avatar: picture,
+        // avatar: picture,
         isEmailVerified: true,
       });
     } else {
       if (name) user.name = name;
-      if (picture) user.avatar = picture;
+      // if (picture) user.avatar = picture;
       user.isEmailVerified = true;
       await user.save();
     }

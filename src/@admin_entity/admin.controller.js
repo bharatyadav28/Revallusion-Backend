@@ -12,6 +12,7 @@ const {
   generateDeviceId,
   getDeviceData,
   filterUserData,
+  awsUrl,
 } = require("../../utils/helperFuns");
 const { s3AdminUploadv4 } = require("../../utils/s3");
 const { instance } = require("../../app");
@@ -113,7 +114,7 @@ exports.uploadImage = async (req, res) => {
   });
 };
 
-exports.sendMeAmin = async (req, res) => {
+exports.sendMeAdmin = async (req, res) => {
   const userId = req.user._id;
 
   const user = await userModel
@@ -221,11 +222,11 @@ exports.getUsers = async (req, res) => {
     ];
   }
 
-  const limit = resultsPerPage || 10;
+  const limit = resultsPerPage || 8;
   const page = currentPage || 1;
   const skip = (page - 1) * limit;
 
-  const users = await userModel.aggregate([
+  const usersPromise = userModel.aggregate([
     {
       $match: query,
     },
@@ -241,19 +242,63 @@ exports.getUsers = async (req, res) => {
       $limit: limit,
     },
     {
+      $lookup: {
+        from: "orders",
+        let: {
+          userId: "$_id",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$user", "$$userId"] },
+                  { $eq: ["$status", "Active"] },
+                  { $gte: ["$expiry_date", new Date()] },
+                ],
+              },
+            },
+          },
+          {
+            $project: {
+              plan: 1,
+            },
+          },
+        ],
+        as: "order",
+      },
+    },
+
+    {
+      $set: {
+        plan: { $arrayElemAt: ["$order.plan", 0] },
+      },
+    },
+
+    {
       $project: {
         name: { $ifNull: ["$name", null] },
         email: 1,
         mobile: { $ifNull: ["$mobile", null] },
+        plan: { $ifNull: ["$plan", null] },
       },
     },
   ]);
+
+  const totalUsersPromise = userModel.countDocuments(query);
+
+  const [users, totalUsers] = await Promise.all([
+    usersPromise,
+    totalUsersPromise,
+  ]);
+  const pagesCount = Math.ceil(totalUsers / limit) || 1;
 
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "User details fetched successfully",
     data: {
       users,
+      pagesCount,
     },
   });
 };
@@ -265,6 +310,13 @@ exports.userDetails = async (req, res) => {
     {
       $match: {
         _id: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $set: {
+        avatar: {
+          $ifNull: [{ $concat: [awsUrl, "/", "$avatar"] }, null],
+        },
       },
     },
 
@@ -336,6 +388,7 @@ exports.userDetails = async (req, res) => {
       $project: {
         name: 1,
         email: 1,
+        avatar: 1,
         mobile: 1,
         transactions: 1,
       },
@@ -368,7 +421,7 @@ exports.userDetails = async (req, res) => {
     success: true,
     message: "User details fetched successfully",
     data: {
-      details,
+      user: details,
       activeOrder: activeOrder || null,
     },
   });
@@ -397,12 +450,11 @@ exports.createUser = async (req, res) => {
   if (plan && !existingPlan)
     throw new BadRequestError("Targeted plan doesnot exist");
 
-  const user = await userModel.create({
-    name,
-    email,
-    mobile,
-    isEmailVerified: true,
-  });
+  const body = { email };
+  if (mobile) body.mobile = mobile;
+  if (plan) body.plan = plan;
+  if (name) body.plan = name;
+  const user = await userModel.create(body);
 
   if (!user) {
     throw new BadRequestError("User creation failed");
@@ -464,24 +516,19 @@ exports.updateUser = async (req, res) => {
 
   // if (existingUser)
   //   throw new BadRequestError("User with this email already exists");
-  if (plan && !existingPlan)
+  if (isPlanUpdated && plan && !existingPlan)
     throw new BadRequestError("Targeted plan doesnot exist");
 
-  const updatedUser = await userModel.findByIdAndUpdate(
-    userId,
-    {
-      name,
-      email,
-      mobile,
-    },
-    {
-      runValidators: true,
-      new: true,
-    }
-  );
+  const body = { email };
+  if (name) body.name = name;
+  if (mobile) body.mobile = mobile;
+
+  const updatedUser = await userModel.findByIdAndUpdate(userId, body, {
+    runValidators: true,
+    new: true,
+  });
 
   if (!updatedUser) {
-    console.log("UpadteUser", this.updateUser);
     throw new BadRequestError("User updation failed");
   }
 
@@ -539,7 +586,7 @@ exports.updateUser = async (req, res) => {
   }
   return res.status(StatusCodes.OK).json({
     success: true,
-    message: "User created successfully",
+    message: "User updated successfully",
   });
 };
 

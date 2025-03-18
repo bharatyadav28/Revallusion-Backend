@@ -8,10 +8,13 @@ const { BadRequestError } = require("../../errors");
 exports.getVideoComments = async (req, res) => {
   const { videoId } = req.params;
 
-  const comments = await CommentModel.find({ video: videoId }).populate({
-    path: "user",
-    select: "name avatar ",
-  });
+  const comments = await CommentModel.find({ video: videoId })
+    .populate({
+      path: "user",
+      select: "name avatar ",
+    })
+    .lean();
+
   return res.status(StatusCodes.OK).json({
     success: true,
     data: { comments },
