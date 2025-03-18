@@ -486,6 +486,7 @@ exports.subscribedCourseAssignments = async (req, res) => {
             $project: {
               _id: 1,
               name: 1,
+              course: 1,
             },
           },
         ],
@@ -561,6 +562,7 @@ exports.subscribedCourseAssignments = async (req, res) => {
       $group: {
         _id: "$module._id",
         moduleName: { $first: "$module.name" },
+        course: { $first: "$module.course" },
 
         videos: {
           $push: {
@@ -588,6 +590,12 @@ exports.subscribedCourseAssignments = async (req, res) => {
             },
           },
         },
+      },
+    },
+    {
+      $sort: {
+        course: 1,
+        moduleName: 1,
       },
     },
   ]);
