@@ -40,7 +40,6 @@ exports.getAllTransactions = async (req, res) => {
           },
           {
             $project: {
-              _id: 0,
               name: 1,
               email: 1,
             },
@@ -57,6 +56,34 @@ exports.getAllTransactions = async (req, res) => {
       },
     },
     {
+      $lookup: {
+        from: "orders",
+        let: {
+          orderId: "$order",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$orderId"] },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              plan: 1,
+            },
+          },
+        ],
+        as: "order",
+      },
+    },
+
+    {
+      $set: {
+        plan: { $arrayElemAt: ["$order.plan", 0] },
+      },
+    },
+    {
       $match: query,
     },
     {
@@ -70,6 +97,13 @@ exports.getAllTransactions = async (req, res) => {
     },
     {
       $limit: limit,
+    },
+    {
+      $project: {
+        order: 0,
+        updatedAt: 0,
+        __v: 0,
+      },
     },
   ]);
 
