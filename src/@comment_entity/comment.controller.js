@@ -1,19 +1,62 @@
+const mongoose = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 
 const CommentModel = require("./comment.model");
 const VideoModel = require("../@video_entity/video.model");
 const { BadRequestError } = require("../../errors");
+const { awsUrl } = require("../../utils/helperFuns");
 
 // Get Video comment
 exports.getVideoComments = async (req, res) => {
   const { videoId } = req.params;
 
-  const comments = await CommentModel.find({ video: videoId })
-    .populate({
-      path: "user",
-      select: "name avatar ",
-    })
-    .lean();
+  const comments = await CommentModel.aggregate([
+    {
+      $match: {
+        video: new mongoose.Types.ObjectId(videoId),
+      },
+    },
+    {
+      $lookup: {
+        from: "users",
+        let: {
+          userId: "$user",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$_id", "$$userId"],
+              },
+            },
+          },
+          {
+            $project: {
+              name: 1,
+              avatar: {
+                $concat: [awsUrl, "/", "$avatar"],
+              },
+            },
+          },
+        ],
+        as: "user",
+      },
+    },
+    {
+      $set: {
+        user: {
+          $arrayElemAt: ["$user", 0],
+        },
+      },
+    },
+  ]);
+
+  // const comments = await CommentModel.find({ video: videoId })
+  //   .populate({
+  //     path: "user",
+  //     select: "name avatar",
+  //   })
+  //   .lean();
 
   return res.status(StatusCodes.OK).json({
     success: true,

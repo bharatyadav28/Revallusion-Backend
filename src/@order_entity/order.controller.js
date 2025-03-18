@@ -245,7 +245,7 @@ exports.mySubscription = async (req, res) => {
   if (activeOrder) {
     hasSubscription = true;
 
-    const planType = activeOrder.plan.planType;
+    const planType = activeOrder.plan.plan_type;
     const paidOn = isoToReadable(activeOrder.start_date);
 
     const today = new Date();
