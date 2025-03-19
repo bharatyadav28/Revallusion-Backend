@@ -16,7 +16,12 @@ exports.getAllTransactions = async (req, res) => {
   if (from || to) {
     query.createdAt = {};
     if (from) query.createdAt.$gte = new Date(from);
-    if (to) query.createdAt.$lte = new Date(to);
+    if (to) {
+      const endOfDay = new Date(to);
+      // Includes whole day
+      endOfDay.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = endOfDay;
+    }
   }
 
   if (paymentId) query.payment_id = paymentId;
