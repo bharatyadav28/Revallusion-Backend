@@ -7,6 +7,7 @@ const dotenv = require("dotenv");
 const multer = require("multer");
 const S3 = require("aws-sdk/clients/s3");
 const sharp = require("sharp");
+const mime = require("mime-types");
 
 const randomBytes = promisify(crypto.randomBytes);
 
@@ -52,7 +53,8 @@ exports.generateUploadURL = async (fileExtension = "mp4") => {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: key,
     Expires: 2400,
-    ContentType: `video/${fileExtension}`,
+    // ContentType: `video/${fileExtension}`,
+    ContentType: mime.lookup(fileExtension) || "application/octet-stream",
   };
 
   const uploadURL = await s3.getSignedUrlPromise("putObject", params);

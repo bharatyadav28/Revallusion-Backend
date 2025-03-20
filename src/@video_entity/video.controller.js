@@ -1,4 +1,9 @@
 const mongoose = require("mongoose");
+const aws = require("aws-sdk");
+const crypto = require("crypto");
+const { promisify } = require("util");
+const mime = require("mime-types");
+
 const { generateUploadURL, s3delete } = require("../../utils/s3.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const VideoModel = require("./video.model.js");
@@ -12,6 +17,7 @@ const {
 } = require("../../utils/helperFuns.js");
 const CourseModel = require("../@course_entity/course.model.js");
 const OrderModel = require("../@order_entity/order.model.js");
+const PlanModel = require("../@plan_entity/plan.model.js");
 
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
@@ -697,5 +703,235 @@ exports.getVideoList = async (req, res, next) => {
     success: true,
     data: { videos, pagesCount },
     message: "Videos fetch successfully",
+  });
+};
+
+// Start video upload of largerize
+
+const randomBytes = promisify(crypto.randomBytes);
+const s3 = new aws.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  region: process.env.AWS_BUCKET_REGION,
+  signatureVersion: "v4",
+});
+
+exports.initiateMultipartUpload = async (req, res) => {
+  const { videoExtension } = req.body;
+
+  const fileExtension = videoExtension || "mp4";
+
+  console.log(videoExtension, fileExtension, mime.lookup(fileExtension));
+
+  const rawBytes = await randomBytes(16);
+  const videoName = rawBytes.toString("hex");
+  let key = `admin-uploads/${Date.now().toString()}-${videoName}.${fileExtension}`;
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    // ContentType: `video/${fileExtension}`,
+    ContentType: mime.lookup(fileExtension) || "application/octet-stream",
+  };
+
+  const multipartUpload = await s3.createMultipartUpload(params).promise();
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: {
+      uploadId: multipartUpload.UploadId,
+      key,
+    },
+  });
+};
+
+exports.getUploadParts = async (req, res) => {
+  const data = req.body;
+  const { uploadId, key, partCount } = data;
+
+  if (!uploadId || !key || !partCount) {
+    throw new BadRequestError("Missing required parameters");
+  }
+
+  const urls = [];
+
+  for (let i = 1; i <= partCount; i++) {
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      UploadId: uploadId,
+      PartNumber: i,
+      Expires: 3600,
+    };
+
+    const uploadURL = await s3.getSignedUrlPromise("uploadPart", params);
+    urls.push({
+      partNumber: i,
+      url: uploadURL,
+    });
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: {
+      urls,
+    },
+  });
+};
+
+exports.completeMultipartUpload = async (req, res) => {
+  const { uploadId, key, parts } = req.body;
+
+  if (!uploadId || !key || !parts || !parts.length) {
+    return res
+      .status(400)
+      .json({ success: false, error: "Missing required parameters" });
+  }
+
+  // Format parts array as expected by S3
+  const formattedParts = parts.map((part) => ({
+    ETag: part.ETag,
+    PartNumber: part.PartNumber,
+  }));
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    UploadId: uploadId,
+    MultipartUpload: {
+      Parts: formattedParts,
+    },
+  };
+
+  const result = await s3.completeMultipartUpload(params).promise();
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    data: {
+      result,
+    },
+  });
+};
+
+exports.abortMultipartUpload = async (req, res) => {
+  const { uploadId, key } = req.body;
+
+  if (!uploadId || !key) {
+    return res
+      .status(400)
+      .json({ success: false, error: "Missing required parameters" });
+  }
+
+  const params = {
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: key,
+    UploadId: uploadId,
+  };
+
+  await s3.abortMultipartUpload(params).promise();
+
+  res.status(200).json({
+    success: true,
+    message: "Upload aborted successfully",
+  });
+};
+
+exports.searchVideos = async (req, res) => {
+  const user = req.user._id;
+  const search = req.query.search;
+
+  const plansPromise = PlanModel.find().select("_id level");
+  const orderPromise = OrderModel.findOne({
+    user,
+    status: "Active",
+    expiry_date: { $gte: Date.now() },
+  })
+    .populate({ path: "plan", select: "_id level" })
+    .select("_id")
+    .lean();
+
+  const [plans, order] = await Promise.all([plansPromise, orderPromise]);
+  if (!order) {
+    throw new BadRequestError("No active plans");
+  }
+
+  const includedPlans = [order.plan._id];
+  if (order.plan.level === Number(process.env.ADVANCE_PLAN)) {
+    const beginnerPlan = plans.find(
+      (plan) => plan.level === Number(process.env.BEGINNER_PLAN)
+    );
+    includedPlans.push(beginnerPlan._id);
+  }
+
+  let videoQuery = {};
+
+  if (search) {
+    const videoRegex = new RegExp(search);
+    videoQuery.$or = [
+      { title: { $regex: videoRegex } },
+      { description: { $regex: videoRegex } },
+    ];
+  }
+
+  const filteredVideos = await CourseModel.aggregate([
+    {
+      $match: {
+        $or: [
+          {
+            plan: {
+              $in: includedPlans,
+            },
+          },
+          { isFree: true },
+        ],
+      },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        let: {
+          courseId: "$_id",
+          planId: "$plan",
+        },
+        pipeline: [
+          {
+            $match: {
+              $and: [
+                {
+                  $expr: { $eq: ["$course", "$$courseId"] },
+                },
+                videoQuery,
+              ],
+            },
+          },
+          {
+            $set: {
+              plan: "$$planId",
+            },
+          },
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              duration: 1,
+              plan: 1,
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+        ],
+        as: "videos",
+      },
+    },
+    { $unwind: "$videos" },
+    { $replaceRoot: { newRoot: "$videos" } },
+  ]);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Video fetched successfully",
+    data: {
+      filteredVideos,
+    },
   });
 };

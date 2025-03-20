@@ -13,6 +13,11 @@ const {
   updateActiveStatus,
   getVideoList,
   getIntroductoryVideos,
+  initiateMultipartUpload,
+  getUploadParts,
+  completeMultipartUpload,
+  abortMultipartUpload,
+  searchVideos,
 } = require("./video.controller.js");
 
 const router = express.Router();
@@ -28,6 +33,8 @@ router.route("/list").post(auth, isAdmin, getVideoList);
 
 router.route("/introductory-videos").get(getIntroductoryVideos);
 
+router.route("/search").get(auth, searchVideos);
+
 router
   .route("/:id")
   .get(auth, getVideo)
@@ -39,5 +46,10 @@ router.route("/active-status/:id").put(auth, isAdmin, updateActiveStatus);
 router
   .route("/permanently-delete/:id")
   .delete(auth, isAdmin, permanatelyDeleteVideo);
+
+router.route("/uploads/initiate").post(auth, isAdmin, initiateMultipartUpload);
+router.route("/uploads/generate-urls").post(auth, isAdmin, getUploadParts);
+router.route("/uploads/complete").post(auth, isAdmin, completeMultipartUpload);
+router.route("/uploads/abort").post(auth, isAdmin, abortMultipartUpload);
 
 module.exports = router;
