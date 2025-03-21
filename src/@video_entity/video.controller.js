@@ -806,7 +806,6 @@ exports.completeMultipartUpload = async (req, res) => {
     success: true,
     data: {
       result,
-      metadata,
     },
   });
 };
