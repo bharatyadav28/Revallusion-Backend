@@ -721,8 +721,6 @@ exports.initiateMultipartUpload = async (req, res) => {
 
   const fileExtension = videoExtension || "mp4";
 
-  console.log(videoExtension, fileExtension, mime.lookup(fileExtension));
-
   const rawBytes = await randomBytes(16);
   const videoName = rawBytes.toString("hex");
   let key = `admin-uploads/${Date.now().toString()}-${videoName}.${fileExtension}`;
@@ -808,6 +806,7 @@ exports.completeMultipartUpload = async (req, res) => {
     success: true,
     data: {
       result,
+      metadata,
     },
   });
 };
@@ -865,7 +864,7 @@ exports.searchVideos = async (req, res) => {
   let videoQuery = {};
 
   if (search) {
-    const videoRegex = new RegExp(search);
+    const videoRegex = new RegExp(search, "i");
     videoQuery.$or = [
       { title: { $regex: videoRegex } },
       { description: { $regex: videoRegex } },
