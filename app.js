@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 const path = require("path");
 const Razorpay = require("razorpay");
 require("express-async-errors");
+require("./utils/cronJobs.js");
 
 const app = express();
 dotenv.config({ path: "./config/config.env" });
