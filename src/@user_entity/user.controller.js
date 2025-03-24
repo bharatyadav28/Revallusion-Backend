@@ -476,6 +476,10 @@ exports.deleteAccount = async (req, res) => {
     throw new BadRequestError("Account deletion failed.");
   }
 
+  res.clearCookie("accessToken");
+  res.clearCookie("refreshToken");
+  res.clearCookie("tempToken");
+
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Account deleted successfully",
