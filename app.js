@@ -71,6 +71,7 @@ const DashboardCarousalRouter = require("./src/@dashboard_carousal_entity/dashbo
 const DashboardContentRouter = require("./src/@dashboard_content_entity /dashboard_content.index.js");
 
 // Paths
+
 // Landing page static paths
 app.use("/api/v1/content/hero-section", heroSectionRouter);
 app.use("/api/v1/content/mentor", mentorRouter);

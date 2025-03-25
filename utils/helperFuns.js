@@ -139,3 +139,107 @@ exports.isoToReadable = (iso) => {
     month < 10 ? "0" + month : month
   }/${year}`;
 };
+
+exports.numberToWords = (number) => {
+  // Check for invalid input
+  if (number < 1 || number > 9999) {
+    throw new Error("Number must be between 1 and 9999");
+  }
+
+  // Define arrays for ones, tens, and teens
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  const teens = [
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+
+  // Separate thousands, hundreds, tens, and ones digits
+  const thousands = Math.floor(number / 1000);
+  const hundreds = Math.floor((number % 1000) / 100);
+  const tensDigit = Math.floor((number % 100) / 10);
+  const onesDigit = number % 10;
+
+  // Build the word representation
+  let words = "";
+
+  // Add thousands part
+  if (thousands > 0) {
+    words += exports.numberToWords(thousands) + " Thousand ";
+  }
+
+  // Add hundreds part
+  if (hundreds > 0) {
+    words += ones[hundreds] + " Hundred ";
+  }
+
+  // Add tens and ones parts
+  if (tensDigit > 0) {
+    if (tensDigit === 1 && onesDigit > 0) {
+      words += teens[onesDigit - 1];
+    } else {
+      words += tens[tensDigit];
+      if (onesDigit > 0) {
+        words += " " + ones[onesDigit];
+      }
+    }
+  } else if (onesDigit > 0) {
+    words += ones[onesDigit];
+  }
+
+  // Remove trailing space
+  words = words.trim();
+
+  return words;
+};
+
+exports.formatDateTime = (dateTimeString, year_only) => {
+  const dateTime = new Date(dateTimeString.getTime() + 19800000);
+  const month = dateTime.toLocaleString("default", { month: "short" });
+  const day = dateTime.getDate();
+  let year = dateTime.getFullYear();
+  year = "" + year + "";
+  const monthNumber = dateTime.getMonth();
+  // if (monthNumber < 3) {
+  //   year = year - 1 + " - " + year;
+  // } else {
+  //   year = year + " - " + (year + 1);
+  // }
+  const time = dateTime.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "numeric",
+    hour12: true,
+  });
+  if (year_only) return year;
+  return `${day} ${month}, ${year}`;
+};

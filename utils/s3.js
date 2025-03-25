@@ -61,19 +61,19 @@ exports.generateUploadURL = async (fileExtension = "mp4") => {
   return { uploadURL, videoName };
 };
 
-exports.s3Uploadv4 = async (file, id) => {
+exports.s3Uploadv4 = async (file, id, type = null) => {
   const s3 = new aws.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_BUCKET_REGION,
   });
 
-  if (!file || !file.mimetype) {
+  if (!file || (!type ? !file.mimetype : false)) {
     throw new Error("Invalid file input");
   }
 
-  const fileType = file.mimetype.split("/")[0]; // Extract file type (image, video, etc.)
-  const extension = file.originalname.split(".").pop(); // Extract file extension
+  const fileType = file.mimetype?.split("/")[0]; // Extract file type (image, video, etc.)
+  const extension = file.originalname?.split(".")?.pop(); // Extract file extension
   const timestamp = Date.now().toString();
   let key, body, contentType;
 
@@ -84,6 +84,9 @@ exports.s3Uploadv4 = async (file, id) => {
       .replaceAll(" ", "")}`;
     body = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
     contentType = "image/webp";
+  } else if (type === "invoice") {
+    key = `invoice/user-${id}-${timestamp}.pdf`;
+    (body = file), (contentType = "application/pdf");
   } else {
     // Handle other file types dynamically
     key = `uploads/user-${id}/${fileType}/${timestamp}-${file.originalname.replace(

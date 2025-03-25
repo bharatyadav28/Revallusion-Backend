@@ -14,6 +14,10 @@ const {
   isoToReadable,
 } = require("../../utils/helperFuns");
 const { default: mongoose } = require("mongoose");
+const {
+  sendInvoice,
+} = require("../@transaction_entity/transaction.controller");
+const { s3Uploadv4 } = require("../../utils/s3");
 
 // Create a new order
 exports.createOrder = async (req, res) => {
@@ -144,12 +148,14 @@ exports.verifyPayment = async (req, res) => {
 
   const isAuthentic = generatedSignature === razorpay_signature;
 
-  const order = await OrderModel.findOne({ order_id: razorpay_order_id });
+  const order = await OrderModel.findOne({
+    order_id: razorpay_order_id,
+  }).populate({ path: "plan", select: "plan_type" });
   if (!order) {
     throw new NotFoundError("Order not found");
   }
 
-  const transaction = await TransactionModel.create({
+  const transactionPromise = TransactionModel.create({
     order: order._id,
     user: order.user,
     payment_id: razorpay_payment_id,
@@ -157,6 +163,17 @@ exports.verifyPayment = async (req, res) => {
     gateway: "Razorpay",
     status: "Pending",
   });
+
+  const userPromise = UserModel.findById(req.user._id).select(
+    "name email mobile"
+  );
+  const countTransactionsPromise = TransactionModel.countDocuments();
+
+  const [transaction, user, countTransactions] = await Promise.all([
+    transactionPromise,
+    userPromise,
+    countTransactionsPromise,
+  ]);
 
   // Check if payment is authentic
   if (!isAuthentic) {
@@ -175,6 +192,8 @@ exports.verifyPayment = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
+  let updatedTransaction;
+
   try {
     // Expire previous active order
     await OrderModel.findOneAndUpdate(
@@ -185,22 +204,33 @@ exports.verifyPayment = async (req, res) => {
 
     // Make current transaction comolete
     transaction.status = "Completed";
-    const saveTransaction = transaction.save({ session });
+    const saveTransactionPromise = transaction.save({ session });
 
     // Make current order active
     order.status = "Active";
     order.razorpay_signature = razorpay_signature;
-    const saveOrder = order.save({ session });
+    const saveOrderPromise = order.save({ session });
 
-    await Promise.all([saveTransaction, saveOrder]);
+    await Promise.all([saveTransactionPromise, saveOrderPromise]);
+
+    const data = await sendInvoice({
+      user,
+      transaction,
+      invoice_no: countTransactions + 1,
+      plan_type: order.plan.plan_type,
+    });
+
+    const result = await s3Uploadv4(data, user._id, "invoice");
+    transaction.invoice_url = result?.Key;
+    await transaction.save({ session });
 
     // Commit the transaction
     await session.commitTransaction();
-    session.endSession();
   } catch (error) {
     await session.abortTransaction();
-    session.endSession();
     throw error;
+  } finally {
+    session.endSession();
   }
 
   const frontendDomain = getFrontendDomain(req);
