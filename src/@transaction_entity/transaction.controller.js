@@ -174,10 +174,10 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
     doc
       .font("Helvetica")
       .fontSize(12)
-      .text("Billing To: " + user.name || "NA", xColumn1, yColumn1, {
+      .text("Billing To: " + (user?.name || "NA"), xColumn1, yColumn1, {
         lineGap: 5,
       })
-      .text("Contact No: " + user?.mobile || "NA", xColumn1, doc.y, {
+      .text("Contact No: " + (user?.mobile || "NA"), xColumn1, doc.y, {
         lineGap: 5,
       })
       .text("Email Id: " + user.email?.slice(0, 30), xColumn1, doc.y, {
@@ -315,7 +315,7 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
           try {
             const attachments = [
               {
-                filename: `${user.name || "user"}.pdf`,
+                filename: `${user?.name || "user"}.pdf`,
                 path: tempFilePath,
                 content: data.toString("base64"),
                 encoding: "base64",
@@ -323,8 +323,8 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
             ];
 
             await sendEmail({
-              to: "anand.test@gmail.com",
-              subject: "Sending an Invoice",
+              to: user.email,
+              subject: "Invoice",
               html,
               attachments,
             });
