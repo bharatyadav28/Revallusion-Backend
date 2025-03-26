@@ -144,11 +144,7 @@ exports.getAllTransactions = async (req, res) => {
 exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
   return new Promise((resolve, reject) => {
     const logoPath = path.join(__dirname, "../../public", "/logo.png");
-    const tempFilePath = path.join(
-      __dirname,
-      "../../temp-files",
-      `/${user._id}.pdf`
-    );
+    const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
     const doc = new PDFDocument();
     const writeStream = fs.createWriteStream(tempFilePath);
 

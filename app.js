@@ -70,6 +70,8 @@ const CommentRouter = require("./src/@comment_entity/comment.index");
 const DashboardCarousalRouter = require("./src/@dashboard_carousal_entity/dashboard_carousal.index");
 const DashboardContentRouter = require("./src/@dashboard_content_entity /dashboard_content.index.js");
 
+const CertificateRouter = require("./src/@certificate_entity/certificate.index.js");
+
 // Paths
 
 // Landing page static paths
@@ -102,6 +104,7 @@ app.use("/api/v1/comment", CommentRouter);
 
 app.use("/api/v1/dashboard/carousal", DashboardCarousalRouter);
 app.use("/api/v1/dashboard/content", DashboardContentRouter);
+app.use("/api/v1/user-certificate", CertificateRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

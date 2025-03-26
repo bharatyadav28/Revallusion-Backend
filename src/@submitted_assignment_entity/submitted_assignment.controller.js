@@ -422,7 +422,7 @@ exports.subscribedCourseAssignments = async (req, res) => {
   let coveredCourseIds = [];
 
   // Fetch all course id having plan level less than or equal to current
-  if (activePlanLevel > 1) {
+  if (activePlanLevel >= 1) {
     const [coveredCourses] = await PlanModel.aggregate([
       {
         $match: {
