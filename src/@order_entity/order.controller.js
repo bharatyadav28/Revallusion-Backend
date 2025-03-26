@@ -12,6 +12,7 @@ const {
   StringToObjectId,
   getFrontendDomain,
   isoToReadable,
+  awsUrl,
 } = require("../../utils/helperFuns");
 const { default: mongoose } = require("mongoose");
 const {
@@ -264,39 +265,108 @@ exports.hasSubscription = async (req, res) => {
 exports.mySubscription = async (req, res) => {
   const userId = req.user._id;
 
-  let hasSubscription = false;
-  let subscriptionDetails = null;
-
-  const activeOrder = await OrderModel.findOne({
-    user: userId,
-    status: "Active",
-  }).populate({ path: "plan", select: "plan_type" });
-
-  if (activeOrder) {
-    hasSubscription = true;
-
-    const planType = activeOrder.plan.plan_type;
-    const paidOn = isoToReadable(activeOrder.start_date);
-
-    const today = new Date();
-    const planExpiryDate = activeOrder.expiry_date;
-    const remainingDays = Math.floor(
-      (planExpiryDate - today) / (1000 * 60 * 60 * 24)
-    );
-
-    subscriptionDetails = {
-      planType,
-      paidOn,
-      remainingDays,
-    };
-  }
+  const [activeOrder] = await OrderModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        status: "Active",
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        let: { planId: "$plan" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$planId"] },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              plan_type: 1,
+            },
+          },
+        ],
+        as: "plan",
+      },
+    },
+    {
+      $lookup: {
+        from: "transactions",
+        let: { orderId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$order", "$$orderId"] },
+            },
+          },
+          {
+            $set: {
+              invoice_url: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $ifNull: ["$invoice_url", false] },
+                      { $ne: ["$invoice_url", ""] },
+                    ],
+                  },
+                  then: {
+                    $concat: [awsUrl, "/", { $toString: "$invoice_url" }],
+                  },
+                  else: null,
+                },
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              invoice_url: 1,
+            },
+          },
+        ],
+        as: "transaction",
+      },
+    },
+    {
+      $set: {
+        planType: { $arrayElemAt: ["$plan.plan_type", 0] },
+        invoice_url: { $arrayElemAt: ["$transaction.invoice_url", 0] },
+        paidOne: {
+          $dateToString: {
+            format: "%d/%m/%Y",
+            date: "$start_date",
+          },
+        },
+        remainingDays: {
+          $floor: {
+            $divide: [
+              { $subtract: ["$expiry_date", new Date()] },
+              1000 * 60 * 60 * 24,
+            ],
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        planType: 1,
+        invoice_url: 1,
+        paidOne: 1,
+        remainingDays: 1,
+      },
+    },
+  ]);
 
   return res.status(StatusCodes.OK).json({
     succes: true,
     message: "Subscription details fetched successfully",
     data: {
-      hasSubscription,
-      subscriptionDetails,
+      hasSubscription: activeOrder ? true : false,
+      subscriptionDetails: activeOrder,
     },
   });
 };
