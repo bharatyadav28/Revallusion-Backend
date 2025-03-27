@@ -334,7 +334,7 @@ exports.mySubscription = async (req, res) => {
       $set: {
         planType: { $arrayElemAt: ["$plan.plan_type", 0] },
         invoice_url: { $arrayElemAt: ["$transaction.invoice_url", 0] },
-        paidOne: {
+        paidOn: {
           $dateToString: {
             format: "%d/%m/%Y",
             date: "$start_date",
@@ -355,7 +355,7 @@ exports.mySubscription = async (req, res) => {
         _id: 0,
         planType: 1,
         invoice_url: 1,
-        paidOne: 1,
+        paidOn: 1,
         remainingDays: 1,
       },
     },

@@ -16,6 +16,10 @@ const {
 } = require("../../utils/helperFuns");
 const { s3AdminUploadv4 } = require("../../utils/s3");
 const { instance } = require("../../app");
+const {
+  generateUserCertificates,
+} = require("../@certificate_entity/certificate.controller");
+const CertificateModel = require("../@certificate_entity/certificate.model");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -276,11 +280,21 @@ exports.getUsers = async (req, res) => {
     },
 
     {
+      $lookup: {
+        from: "certificates",
+        foreignField: "user",
+        localField: "_id",
+        as: "certificates",
+      },
+    },
+
+    {
       $project: {
         name: { $ifNull: ["$name", null] },
         email: 1,
         mobile: { $ifNull: ["$mobile", null] },
         plan: { $ifNull: ["$plan", null] },
+        certificates: 1,
       },
     },
   ]);
@@ -496,7 +510,8 @@ exports.createUser = async (req, res) => {
 };
 
 exports.updateUser = async (req, res) => {
-  const { name, email, mobile, plan, isPlanUpdated } = req.body;
+  const { name, email, mobile, plan, isPlanUpdated, issuedCertificates } =
+    req.body;
   const { id: userId } = req.params;
 
   if (!email) {
@@ -504,18 +519,21 @@ exports.updateUser = async (req, res) => {
   }
 
   const existingUserPromise = userModel.findOne({ email });
+  const existingCertificatesPromise = CertificateModel.find({
+    user: userId,
+  });
+
   let planPromise = null;
   if (isPlanUpdated && plan) {
     planPromise = await PlanModel.findById(plan);
   }
 
-  const [existingUser, existingPlan] = await Promise.all([
+  const [existingUser, existingCertificates, existingPlan] = await Promise.all([
     existingUserPromise,
+    existingCertificatesPromise,
     planPromise,
   ]);
 
-  // if (existingUser)
-  //   throw new BadRequestError("User with this email already exists");
   if (isPlanUpdated && plan && !existingPlan)
     throw new BadRequestError("Targeted plan doesnot exist");
 
@@ -532,6 +550,7 @@ exports.updateUser = async (req, res) => {
     throw new BadRequestError("User updation failed");
   }
 
+  // Plan
   if (isPlanUpdated) {
     const session = await mongoose.startSession();
     session.startTransaction();
@@ -584,6 +603,64 @@ exports.updateUser = async (req, res) => {
       session.endSession();
     }
   }
+
+  // Certificate
+  let byPassCertificateMuatation = false;
+
+  requestedCertificates = issuedCertificates?.filter(
+    (item) => item.certificate
+  );
+
+  const toCreateCertificates =
+    requestedCertificates?.filter(
+      (item) =>
+        !existingCertificates?.some(
+          (subItem) => subItem?.plan.toString() === item._id.toString()
+        )
+    ) || [];
+
+  const toDeleteCertificates = existingCertificates?.filter(
+    (item) =>
+      !requestedCertificates?.some(
+        (subItem) => subItem?._id.toString() === item.plan.toString()
+      )
+  );
+
+  if (
+    toCreateCertificates?.length === 0 &&
+    toDeleteCertificates?.length === 0
+  ) {
+    byPassCertificateMuatation = true;
+  }
+
+  if (!byPassCertificateMuatation) {
+    const certificatePromises = [];
+
+    // Create user certificates(may be of multiple plans)
+    if (toCreateCertificates?.length > 0) {
+      const createPromise = generateUserCertificates({
+        plans: toCreateCertificates,
+        user: updatedUser,
+      });
+      certificatePromises.push(createPromise);
+    }
+
+    if (toDeleteCertificates?.length > 0) {
+      const planIds = toDeleteCertificates?.map((certificate) =>
+        certificate.plan.toString()
+      );
+      const deletePromise = CertificateModel.deleteMany({
+        user: userId,
+        plan: { $in: planIds },
+      });
+      certificatePromises.push(deletePromise);
+    }
+
+    if (certificatePromises.length > 0) {
+      await Promise.all(certificatePromises);
+    }
+  }
+
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "User updated successfully",

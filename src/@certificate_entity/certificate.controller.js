@@ -7,32 +7,18 @@ const CourseModel = require("../@course_entity/course.model");
 const VideoModel = require("../@video_entity/video.model.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 
-exports.createCertificate = async (req, res) => {
-  const { name } = req.body;
-
-  const userId = req.user._id;
-
-  const activeOrder = await OrderModel.findOne({
-    user: userId,
-    status: "Active",
-  }).populate({
-    path: "plan",
-    select: "plan_type level",
-  });
-  if (!activeOrder) {
-    throw new NotFoundError("You don't have any active plan");
-  }
-
-  const activePlanLevel = activeOrder.plan.level;
+// Helper function for progress calculation
+const calculateProgress = async ({ user, activePlan, isAdmin }) => {
+  const userId = user?._id;
   let coveredCourseIds = [];
 
   // Fetch all course ids eligible under current plan
-  if (activePlanLevel >= 1) {
+  if (activePlan?.level >= 1) {
     const [coveredCourses] = await PlanModel.aggregate([
       {
         $match: {
           level: {
-            $lte: activePlanLevel,
+            $lte: activePlan.level,
           },
         },
       },
@@ -173,13 +159,13 @@ exports.createCertificate = async (req, res) => {
   const { inCompleteVideos, totalAssignments, scoresSum, unGradedAssignments } =
     progress[0];
 
-  if (inCompleteVideos > 0) {
+  if (!isAdmin && inCompleteVideos > 0) {
     const errorText =
       inCompleteVideos === 1 ? "1 video is" : `${inCompleteVideos} videos  are`;
     throw new BadRequestError(`${errorText} not complete`);
   }
 
-  if (unGradedAssignments > 0) {
+  if (!isAdmin && unGradedAssignments > 0) {
     const errorText =
       unGradedAssignments === 1
         ? "1 assignment is"
@@ -195,14 +181,76 @@ exports.createCertificate = async (req, res) => {
     averageAssigmentsScore = (scoresSum / totalAssignments).toFixed(2);
   }
 
+  const certificate = await CertificateModel.create({
+    plan: activePlan._id,
+    user,
+    path: "/test",
+  });
+
+  if (!certificate) {
+    throw new BadRequestError("Certificate creation failed");
+  }
+
+  return {
+    progress,
+    averageAssigmentsScore,
+  };
+};
+
+// By user
+exports.generateMyCertificate = async (req, res) => {
+  const { name } = req.body;
+
+  const userId = req.user._id;
+
+  const activeOrder = await OrderModel.findOne({
+    user: userId,
+    status: "Active",
+  }).populate({
+    path: "plan",
+    select: "plan_type level",
+  });
+  if (!activeOrder) {
+    throw new NotFoundError("You don't have any active plan");
+  }
+
+  const activePlan = activeOrder.plan;
+
+  const user = req.user;
+  user.name = name;
+
+  const result = await calculateProgress({
+    user,
+    activePlan,
+    isAdmin: false,
+  });
+
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Certificate created successfully",
     data: {
-      progress,
-      averageAssigmentsScore,
+      ...result,
     },
   });
+};
+
+// By admin (Helper fun)
+exports.generateUserCertificates = async ({ plans, user }) => {
+  const progressPromises = [];
+
+  plans?.forEach((plan) => {
+    const promise = calculateProgress({
+      user,
+      activePlan: plan,
+      isAdmin: true,
+    });
+    progressPromises.push(promise);
+  });
+
+  const progress = await Promise.all(progressPromises);
+
+  console.log("Progress", progress);
+  return progress;
 };
 
 exports.getCertificates = async (req, res) => {
