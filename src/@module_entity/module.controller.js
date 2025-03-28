@@ -15,7 +15,7 @@ exports.createModule = async (req, res, next) => {
 
 // Fetch all modules
 exports.getModules = async (req, res) => {
-  const modules = await ModuleModel.find().lean();
+  const modules = await ModuleModel.find().sort({ name: 1 }).lean();
 
   res.status(StatusCodes.OK).json({
     success: true,
