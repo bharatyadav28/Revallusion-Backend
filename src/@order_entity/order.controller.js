@@ -54,7 +54,6 @@ exports.createOrder = async (req, res) => {
 
     if (activeOrder.expiry_date <= today) {
       // Active order is expired
-
       activeOrder.status = "Expire";
       await activeOrder.save();
     } else {
@@ -62,26 +61,21 @@ exports.createOrder = async (req, res) => {
       const activePlanLevel = activeOrder.plan.level;
       const newPlanLevel = existingPlan.level;
 
-      // Advance dynamic check
-      if (
-        activePlanLevel === newPlanLevel ||
-        (activePlanLevel === Number(process.env.ADVANCE_PLAN) &&
-          newPlanLevel === Number(process.env.BEGINNER_PLAN))
-      ) {
+      if (activePlanLevel === newPlanLevel) {
         throw new BadRequestError("You already have this plan");
       }
 
-      // Active plan stats
-      const activeRemainingDays = Math.ceil(
-        (activeOrder.expiry_date - today) / (1000 * 60 * 60 * 24)
-      );
+      // Advance dynamic check
+      if (
+        activePlanLevel === Number(process.env.ADVANCE_PLAN) &&
+        newPlanLevel === Number(process.env.BEGINNER_PLAN)
+      ) {
+        throw new BadRequestError(
+          "Your active plan already includes this plan"
+        );
+      }
 
-      // Active plan price validity
-      const activeValidity = activeOrder.plan.validity / (60 * 60 * 24);
-
-      // Active plan per day amount
-      const activePerDayAmount = activeOrder.plan.inr_price / activeValidity;
-      remainingAmount = activeRemainingDays * activePerDayAmount;
+      remainingAmount = activeOrder.plan.inr_price;
     }
   }
 
