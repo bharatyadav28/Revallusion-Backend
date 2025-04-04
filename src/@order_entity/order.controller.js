@@ -79,6 +79,8 @@ exports.createOrder = async (req, res) => {
     }
   }
 
+  const hasUpgraded = remainingAmount > 0 ? true : false;
+
   // New order validity
   const validityInDays = existingPlan.validity / (60 * 60 * 24);
   expiry_date.setDate(expiry_date.getDate() + validityInDays);
@@ -103,6 +105,7 @@ exports.createOrder = async (req, res) => {
     expiry_date,
     status: "Pending",
     actual_price: existingPlan.inr_price,
+    hasUpgraded,
   };
 
   const savedOrder = await OrderModel.create(query);

@@ -33,6 +33,10 @@ const schema = new mongoose.Schema(
     actual_price: {
       type: Number,
     },
+    hasUpgraded: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
