@@ -4,6 +4,7 @@ const StatusCodes = require("http-status-codes");
 const userModel = require("../@user_entity/user.model");
 const OrderModel = require("../@order_entity/order.model");
 const PlanModel = require("../@plan_entity/plan.model");
+const TransactionModel = require("../@transaction_entity/transaction.model");
 const { NotFoundError, BadRequestError } = require("../../errors");
 const {
   updateSessionAndCreateTokens,
@@ -20,6 +21,7 @@ const {
   generateUserCertificates,
 } = require("../@certificate_entity/certificate.controller");
 const CertificateModel = require("../@certificate_entity/certificate.model");
+const QueryModel = require("../@query_entity/query.model");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -681,5 +683,129 @@ exports.deleteUser = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "User deleted successfully",
+  });
+};
+
+exports.getDashBoardContent = async (req, res) => {
+  const userPromise = userModel.countDocuments({ isDeleted: false });
+
+  const activeOrderPromise = OrderModel.aggregate([
+    {
+      $match: { status: "Active" },
+    },
+    {
+      $group: {
+        _id: "$plan",
+        usersCount: { $sum: 1 },
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        localField: "_id",
+        foreignField: "_id",
+        as: "plan",
+      },
+    },
+    {
+      $set: {
+        planName: {
+          $arrayElemAt: ["$plan.plan_type", 0],
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        planName: 1,
+        usersCount: 1,
+      },
+    },
+  ]);
+
+  const ordersUpgradedPromise = OrderModel.aggregate([
+    {
+      $match: {
+        hasUpgraded: true,
+      },
+    },
+    {
+      $group: {
+        _id: "$user",
+      },
+    },
+    { $count: "totalUpgradedUsers" },
+  ]);
+
+  const queriesPromise = QueryModel.countDocuments();
+
+  // Calculate revenues
+
+  const IST_OFFSET = 5.5 * 60 * 60 * 1000;
+  const nowUTC = new Date(); // UTC time on Render or AWS
+  const nowIST = new Date(nowUTC.getTime() + IST_OFFSET);
+
+  const startOfDay = new Date(nowIST);
+  startOfDay.setHours(0, 0, 0, 0);
+  const startOfWeek = new Date(startOfDay);
+  startOfWeek.setDate(startOfDay.getDate() - startOfDay.getDay());
+  const startOfMonth = new Date(nowIST.getFullYear(), nowIST.getMonth(), 1);
+  const startOfYear = new Date(nowIST.getFullYear(), 0, 1);
+
+  // USTs corresponding to ISTs values
+  const startOfDayUTC = new Date(startOfDay.getTime() - IST_OFFSET);
+  const startOfWeekUTC = new Date(startOfWeek.getTime() - IST_OFFSET);
+  const startOfMonthUTC = new Date(startOfMonth.getTime() - IST_OFFSET);
+  const startOfYearUTC = new Date(startOfYear.getTime() - IST_OFFSET);
+
+  const revenuesPromise = OrderModel.aggregate([
+    {
+      $match: {
+        status: { $in: ["Active", "Expire"] },
+        createdAt: { $gte: startOfYearUTC },
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        daily: {
+          $sum: {
+            $cond: [{ $gte: ["$createdAt", startOfDayUTC] }, "$inr_price", 0],
+          },
+        },
+        weekly: {
+          $sum: {
+            $cond: [{ $gte: ["$createdAt", startOfWeekUTC] }, "$inr_price", 0],
+          },
+        },
+        monthly: {
+          $sum: {
+            $cond: [{ $gte: ["$createdAt", startOfMonthUTC] }, "$inr_price", 0],
+          },
+        },
+        yearly: { $sum: "$inr_price" },
+      },
+    },
+  ]);
+
+  const [usersCount, activeOrder, ordersUpgraded, queries, revenues] =
+    await Promise.all([
+      userPromise,
+      activeOrderPromise,
+      ordersUpgradedPromise,
+      queriesPromise,
+      revenuesPromise,
+    ]);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Dashboard content fetched successfully",
+    data: {
+      usersCount,
+      activeOrder,
+      plansUpgraded: ordersUpgraded?.[0].totalUpgradedUsers,
+      queries,
+      revenues: revenues?.[0],
+    },
   });
 };

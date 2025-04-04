@@ -14,6 +14,7 @@ const {
   updateUser,
   deleteUser,
   sendMeAdmin,
+  getDashBoardContent,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 
@@ -45,5 +46,7 @@ router
   .get(auth, isAdmin, userDetails)
   .put(auth, isAdmin, updateUser)
   .delete(auth, isAdmin, deleteUser);
+
+router.route("/dashboard").get(auth, isAdmin, getDashBoardContent);
 
 module.exports = router;
