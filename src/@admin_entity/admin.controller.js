@@ -469,7 +469,7 @@ exports.createUser = async (req, res) => {
   const body = { email };
   if (mobile) body.mobile = mobile;
   if (plan) body.plan = plan;
-  if (name) body.plan = name;
+  if (name) body.name = name;
   const user = await userModel.create(body);
 
   if (!user) {
