@@ -2,8 +2,8 @@ const express = require("express");
 
 const { auth, isAdmin } = require("../../middlewares/authentication");
 const {
-  createOrder,
-  verifyPayment,
+  createRazorpayOrder,
+  verifyRazorpayPayment,
   getApiKey,
   hasSubscription,
   mySubscription,
@@ -11,11 +11,10 @@ const {
 
 const router = express.Router();
 
-router.route("/").post(auth, createOrder);
-
+// Razor-pay
+router.route("/razor-pay").post(auth, createRazorpayOrder);
 router.route("/get-key").get(auth, getApiKey);
-
-router.route("/verify-payment").post(auth, verifyPayment);
+router.route("/razor-pay/verify").post(auth, verifyRazorpayPayment);
 
 router.route("/has-subscription/:userId").get(hasSubscription);
 

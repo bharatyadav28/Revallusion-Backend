@@ -20,11 +20,8 @@ const {
 } = require("../@transaction_entity/transaction.controller");
 const { s3Uploadv4 } = require("../../utils/s3");
 
-// Create a new order
-exports.createOrder = async (req, res) => {
-  const { plan } = req.body;
-  const userId = req?.user?._id;
-
+// Helper functions
+const getOrderDetails = async ({ plan, userId }) => {
   const user = await UserModel.findById(userId);
   if (!user)
     throw new NotFoundError("Account not found, please create a new account");
@@ -87,6 +84,118 @@ exports.createOrder = async (req, res) => {
 
   // Amount in Rupees
   const amount = Math.floor(existingPlan.inr_price - remainingAmount);
+
+  const orderDetails = {
+    existingPlan: {
+      _id: existingPlan._id,
+      inr_price: existingPlan.inr_price,
+    },
+    amount,
+    expiry_date,
+    hasUpgraded,
+  };
+
+  return orderDetails;
+};
+
+const activateSubscription = async ({
+  order_id,
+  gateway,
+  payment_id,
+  isAuthentic,
+  userId,
+  razorpay_signature,
+}) => {
+  const order = await OrderModel.findOne({
+    order_id,
+  }).populate({ path: "plan", select: "plan_type" });
+  if (!order) {
+    throw new NotFoundError("Order not found");
+  }
+
+  const transactionPromise = TransactionModel.create({
+    order: order._id,
+    user: order.user,
+    payment_id,
+    amount: order.inr_price,
+    gateway,
+    status: "Pending",
+  });
+
+  const userPromise = UserModel.findById(userId).select("name email mobile");
+  const countTransactionsPromise = TransactionModel.countDocuments();
+
+  const [transaction, user, countTransactions] = await Promise.all([
+    transactionPromise,
+    userPromise,
+    countTransactionsPromise,
+  ]);
+
+  // Check if payment is authentic
+  if (!isAuthentic) {
+    transaction.status = "Failed";
+    const saveTransaction = transaction.save();
+    const deleteOrder = order.deleteOne();
+
+    await Promise.all([saveTransaction, deleteOrder]);
+
+    return res.status(StatusCodes.BAD_REQUEST).json({
+      success: false,
+      message: "Payment verification failed",
+    });
+  }
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    // Expire previous active order
+    await OrderModel.findOneAndUpdate(
+      { user: order.user, status: "Active" },
+      { $set: { status: "Expire" } },
+      { new: true, runValidators: true, session }
+    );
+
+    // Make current transaction comolete
+    transaction.status = "Completed";
+    const saveTransactionPromise = transaction.save({ session });
+
+    // Make current order active
+    order.status = "Active";
+    if (razorpay_signature) order.razorpay_signature = razorpay_signature;
+    const saveOrderPromise = order.save({ session });
+
+    await Promise.all([saveTransactionPromise, saveOrderPromise]);
+
+    const data = await sendInvoice({
+      user,
+      transaction,
+      invoice_no: countTransactions + 1,
+      plan_type: order.plan.plan_type,
+    });
+
+    const result = await s3Uploadv4(data, user._id, "invoice");
+    transaction.invoice_url = result?.Key;
+    await transaction.save({ session });
+
+    // Commit the transaction
+    await session.commitTransaction();
+  } catch (error) {
+    await session.abortTransaction();
+    throw error;
+  } finally {
+    session.endSession();
+  }
+};
+
+// Create a new order
+exports.createRazorpayOrder = async (req, res) => {
+  const { plan } = req.body;
+  const userId = req?.user?._id;
+
+  const { existingPlan, amount, expiry_date, hasUpgraded } =
+    await getOrderDetails({ plan, userId });
+
   const paise = Number(amount) * 100;
 
   // Razorpay order
@@ -127,7 +236,7 @@ exports.getApiKey = async (req, res) => {
 };
 
 // Payment verification
-exports.verifyPayment = async (req, res) => {
+exports.verifyRazorpayPayment = async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
     req.body;
 
@@ -146,90 +255,14 @@ exports.verifyPayment = async (req, res) => {
 
   const isAuthentic = generatedSignature === razorpay_signature;
 
-  const order = await OrderModel.findOne({
+  await activateSubscription({
     order_id: razorpay_order_id,
-  }).populate({ path: "plan", select: "plan_type" });
-  if (!order) {
-    throw new NotFoundError("Order not found");
-  }
-
-  const transactionPromise = TransactionModel.create({
-    order: order._id,
-    user: order.user,
-    payment_id: razorpay_payment_id,
-    amount: order.inr_price,
     gateway: "Razorpay",
-    status: "Pending",
+    payment_id: razorpay_payment_id,
+    isAuthentic,
+    userId: req.user._id,
+    razorpay_signature,
   });
-
-  const userPromise = UserModel.findById(req.user._id).select(
-    "name email mobile"
-  );
-  const countTransactionsPromise = TransactionModel.countDocuments();
-
-  const [transaction, user, countTransactions] = await Promise.all([
-    transactionPromise,
-    userPromise,
-    countTransactionsPromise,
-  ]);
-
-  // Check if payment is authentic
-  if (!isAuthentic) {
-    transaction.status = "Failed";
-    const saveTransaction = transaction.save();
-    const deleteOrder = order.deleteOne();
-
-    await Promise.all([saveTransaction, deleteOrder]);
-
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: "Payment verification failed",
-    });
-  }
-
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
-  let updatedTransaction;
-
-  try {
-    // Expire previous active order
-    await OrderModel.findOneAndUpdate(
-      { user: order.user, status: "Active" },
-      { $set: { status: "Expire" } },
-      { new: true, runValidators: true, session }
-    );
-
-    // Make current transaction comolete
-    transaction.status = "Completed";
-    const saveTransactionPromise = transaction.save({ session });
-
-    // Make current order active
-    order.status = "Active";
-    order.razorpay_signature = razorpay_signature;
-    const saveOrderPromise = order.save({ session });
-
-    await Promise.all([saveTransactionPromise, saveOrderPromise]);
-
-    const data = await sendInvoice({
-      user,
-      transaction,
-      invoice_no: countTransactions + 1,
-      plan_type: order.plan.plan_type,
-    });
-
-    const result = await s3Uploadv4(data, user._id, "invoice");
-    transaction.invoice_url = result?.Key;
-    await transaction.save({ session });
-
-    // Commit the transaction
-    await session.commitTransaction();
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
-  }
 
   const frontendDomain = getFrontendDomain(req);
   return res.redirect(`${frontendDomain}/verify-payment`);
