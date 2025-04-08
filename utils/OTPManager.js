@@ -82,7 +82,7 @@ class OTPManager {
     const otpRecord = await otpModel.findOne(query);
 
     if (!otpRecord) {
-      throw new Error("Invalid or expired OTP");
+      throw new Error("Invalid or Expired OTP");
     }
 
     // Delete used OTP
