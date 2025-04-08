@@ -35,6 +35,9 @@ const SubmittedAssignmentSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
+  revokedAt: {
+    type: Date,
+  },
 });
 
 SubmittedAssignmentSchema.index({ video: 1, user: 1 });

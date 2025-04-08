@@ -281,19 +281,25 @@ exports.getSubmittedAssignments = async (req, res) => {
             },
           },
           {
+            $sort: { submittedAt: 1 },
+          },
+          {
             // Includes required field
             $project: {
+              submittedAt: 1,
               submittedFileUrl: 1,
+              score: 1,
+              revokedAt: 1,
               _id: 0,
             },
           },
 
-          {
-            // Rename submittedFileUrl to url
-            $replaceRoot: {
-              newRoot: { url: "$submittedFileUrl" },
-            },
-          },
+          // {
+          //   // Rename submittedFileUrl to url
+          //   $replaceRoot: {
+          //     newRoot: { url: "$submittedFileUrl" },
+          //   },
+          // },
         ],
         as: "revokedSubmissions",
       },
@@ -301,15 +307,15 @@ exports.getSubmittedAssignments = async (req, res) => {
     {
       // Convert revokedSubmissions (mutliple url objects)  to contain only url strings
       $addFields: {
-        revokedSubmissions: {
-          $map: {
-            input: "$revokedSubmissions",
-            as: "submission",
-            in: {
-              $concat: [awsUrl, "/", "$$submission.url"],
-            },
-          },
-        },
+        // revokedSubmissions: {
+        //   $map: {
+        //     input: "$revokedSubmissions",
+        //     as: "submission",
+        //     in: {
+        //       $concat: [awsUrl, "/", "$$submission.url"],
+        //     },
+        //   },
+        // },
         submittedFileUrl: {
           $concat: [awsUrl, "/", "$submittedFileUrl"],
         },
@@ -385,6 +391,7 @@ exports.revokeAssignment = async (req, res) => {
     },
     {
       isRevoked: true,
+      revokedAt: new Date(),
       // score: null,
     },
     { runValidators: true }

@@ -1,3 +1,6 @@
+const path = require("path");
+const fs = require("fs");
+const PDFDocument = require("pdfkit");
 const { StatusCodes } = require("http-status-codes");
 
 const CertificateModel = require("./certificate.model");
@@ -6,6 +9,59 @@ const PlanModel = require("../@plan_entity/plan.model.js");
 const CourseModel = require("../@course_entity/course.model");
 const VideoModel = require("../@video_entity/video.model.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
+
+// Test
+exports.createCertfifcate = async (req, res) => {
+  const tempFilePath = path.join("test", `certficate.pdf`);
+
+  const doc = new PDFDocument({
+    size: "A4", // Standard A4 size
+    margins: { top: 30, left: 30, right: 30, bottom: 30 }, // Outer margins
+  });
+
+  const writeStream = fs.createWriteStream(tempFilePath);
+
+  const pageWidth = doc.page.width;
+  const pageHeight = doc.page.height;
+  const margin = 50; // Margin from outer div
+
+  // Outer Div (Full Page)
+  doc.rect(0, 0, pageWidth, pageHeight).fill("#FFF");
+
+  // Inner Div (with some margin)
+  const innerX = margin;
+  const innerY = margin;
+  const innerWidth = pageWidth - 2 * margin;
+  const innerHeight = pageHeight - 2 * margin;
+
+  doc.fillColor("#F2EEEB").rect(innerX, innerY, innerWidth, innerHeight).fill();
+
+  // Adding some text inside the inner div
+  doc
+    .fillColor("black")
+    .fontSize(20)
+    .text("This is the my inner Div", innerX + 20, innerY + 20);
+
+  doc
+    .save() // Save the current state
+
+    .moveTo(100, 200) // Starting point (x, y)
+    .lineTo(200, 100) // Draw to second point
+    .lineTo(300, 200) // Draw to third point
+    .lineTo(100, 200) // Close the triangle
+    .fill("#ff5733") // Background color (fill)
+
+    .restore();
+
+  // Finalize the PDF
+  doc.end();
+  doc.pipe(writeStream);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Certificate created successfully",
+  });
+};
 
 // Helper function for progress calculation
 const calculateProgress = async ({ user, activePlan, isAdmin }) => {
