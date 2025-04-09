@@ -14,6 +14,7 @@ const {
   appendBucketName,
   awsUrl,
   StringToObjectId,
+  generateUniqueId,
 } = require("../../utils/helperFuns.js");
 const CourseModel = require("../@course_entity/course.model.js");
 const OrderModel = require("../@order_entity/order.model.js");
@@ -722,8 +723,10 @@ exports.initiateMultipartUpload = async (req, res) => {
   const fileExtension = videoExtension || "mp4";
 
   const rawBytes = await randomBytes(16);
-  const videoName = rawBytes.toString("hex");
-  let key = `admin-uploads/${Date.now().toString()}-${videoName}.${fileExtension}`;
+  // const videoName = rawBytes.toString("hex");
+
+  const uuid = generateUniqueId();
+  let key = `admin-uploads/${uuid}.${fileExtension}`;
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,

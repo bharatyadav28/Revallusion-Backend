@@ -37,7 +37,7 @@ exports.uploadAssignmentAnswer = async (req, res) => {
   }
 
   // Get file type
-  result = await s3Uploadv4(req.file, req.user._id);
+  result = await s3Uploadv4(req.file, "submitted_assignments");
 
   return res.status(StatusCodes.OK).json({
     success: true,

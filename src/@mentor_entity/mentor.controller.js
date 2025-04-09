@@ -57,7 +57,7 @@ exports.updateCurriculum = async (req, res, next) => {
     throw new NotFoundError("Mentor's data  should be added first");
   }
 
-  const curriculumPath = (await s3AdminUploadv4(req.file)).Key;
+  const curriculumPath = (await s3AdminUploadv4(req.file, "Curriculum")).Key;
 
   mentor.curriculum = curriculumPath;
   await mentor.save();

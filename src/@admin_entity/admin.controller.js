@@ -97,13 +97,14 @@ exports.uploadImage = async (req, res) => {
   if (!req.file) {
     throw new BadRequestError("Please upload an image");
   }
+  const folder = req.body.folder || "thumbnails";
 
   // Get file type
   const fileType = req.file.mimetype.split("/")[0];
 
   let uploadResult;
   if (fileType === "image") {
-    uploadResult = await s3AdminUploadv4(req.file);
+    uploadResult = await s3AdminUploadv4(req.file, folder);
   } else {
     return res
       .status(StatusCodes.BAD_REQUEST)
@@ -140,8 +141,9 @@ exports.uploadFile = async (req, res) => {
   if (!req.file) {
     throw new BadRequestError("Please upload an file");
   }
+  const folder = req.body.folder || "resources";
 
-  const uploadResult = await s3AdminUploadv4(req.file);
+  const uploadResult = await s3AdminUploadv4(req.file, folder);
 
   // Generate image URL
   const result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;

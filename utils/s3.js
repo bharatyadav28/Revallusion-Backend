@@ -8,6 +8,7 @@ const multer = require("multer");
 const S3 = require("aws-sdk/clients/s3");
 const sharp = require("sharp");
 const mime = require("mime-types");
+const { generateUniqueId } = require("./helperFuns");
 
 const randomBytes = promisify(crypto.randomBytes);
 
@@ -47,7 +48,9 @@ exports.s3UploadVideo = async (file, id, access) => {
 exports.generateUploadURL = async (fileExtension = "mp4") => {
   const rawBytes = await randomBytes(16);
   const videoName = rawBytes.toString("hex");
-  let key = `admin-uploads/${Date.now().toString()}-${videoName}.${fileExtension}`;
+
+  const uuid = generateUniqueId();
+  let key = `admin-uploads/${uuid}.${fileExtension}`;
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -61,7 +64,7 @@ exports.generateUploadURL = async (fileExtension = "mp4") => {
   return { uploadURL, videoName };
 };
 
-exports.s3Uploadv4 = async (file, id, type = null) => {
+exports.s3Uploadv4 = async (file, folder, type = null) => {
   const s3 = new aws.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -77,25 +80,26 @@ exports.s3Uploadv4 = async (file, id, type = null) => {
   const timestamp = Date.now().toString();
   let key, body, contentType;
 
+  const uuid = generateUniqueId();
+  const folderName = folder || "uploads";
+  key = `${folderName}/${uuid}`;
+
   if (fileType === "image") {
     // Convert image to WebP for optimization
-    key = `uploads/user-${id}/profile/${timestamp}-${file.originalname
-      .replace(/\.[^.]+$/, ".webp")
-      .replaceAll(" ", "")}`;
+    key = `${key}.webp`;
     body = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
     contentType = "image/webp";
   } else if (type === "invoice") {
-    key = `invoice/user-${id}-${timestamp}.pdf`;
+    key = `${key}.pdf`;
     (body = file), (contentType = "application/pdf");
   } else {
     // Handle other file types dynamically
-    key = `uploads/user-${id}/${fileType}/${timestamp}-${file.originalname.replace(
-      /\s+/g,
-      ""
-    )}`;
+
     body = file.buffer;
     contentType = file.mimetype; // Use original content type
   }
+
+  console.log("Key", key);
 
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
@@ -116,17 +120,15 @@ exports.s3Uploadv4Query = async (file) => {
     region: process.env.AWS_BUCKET_REGION,
   });
 
-  // Generate a unique key for the file
-  const key = `uploads/user/query/${Date.now().toString()}-${file.originalname.replaceAll(
-    " ",
-    ""
-  )}`;
+  const uuid = generateUniqueId();
+  let key = `queries/${uuid}`;
 
   let fileBuffer = file.buffer;
   let contentType = file.mimetype;
 
   // Optionally process images for optimization
   if (file.mimetype.startsWith("image/")) {
+    key = `${key}.webp`;
     fileBuffer = await sharp(file.buffer).toBuffer();
     contentType = file.mimetype; // Maintain original content type
   }
@@ -145,23 +147,23 @@ exports.s3Uploadv4Query = async (file) => {
   return data;
 };
 
-exports.s3AdminUploadv4 = async (file) => {
+exports.s3AdminUploadv4 = async (file, folder) => {
   const s3 = new aws.S3({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
     region: process.env.AWS_BUCKET_REGION,
   });
   let buffer = file.buffer;
-  let key = `uploads/users-${Date.now().toString()}-${file.originalname.replaceAll(
-    " ",
-    ""
-  )}`;
+
+  const uuid = generateUniqueId();
+  const folderName = folder || "uploads";
+  let key = `${folderName}/${uuid}`;
   let contentType = file.mimetype;
 
   // Check if file is an image and convert it to WebP
   if (file.mimetype.startsWith("image/")) {
     buffer = await sharp(file.buffer).webp({ quality: 80 }).toBuffer();
-    key = key.replace(/\.[^.]+$/, ".webp"); // Change extension to .webp
+    key = `${key}.webp`; // Change extension to .webp
     contentType = "image/webp";
   }
 

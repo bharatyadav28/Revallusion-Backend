@@ -374,7 +374,7 @@ exports.updateAvatar = async (req, res) => {
     throw new BadRequestError("Please upload an image");
   }
 
-  const result = await s3Uploadv4(file, userId);
+  const result = await s3Uploadv4(file, "profile");
 
   const user = await userModel.findByIdAndUpdate(
     userId,

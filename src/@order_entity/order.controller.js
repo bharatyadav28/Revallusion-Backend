@@ -186,7 +186,7 @@ const activateSubscription = async ({
       plan_type: order.plan.plan_type,
     });
 
-    const result = await s3Uploadv4(data, user._id, "invoice");
+    const result = await s3Uploadv4(data, "invoices", "invoice");
     transaction.invoice_url = result?.Key;
     await transaction.save({ session });
 
