@@ -1,4 +1,5 @@
 const UAParser = require("ua-parser-js");
+const { v4: uuidv4 } = require("uuid");
 
 const userModel = require("../src/@user_entity/user.model");
 const { NotFoundError } = require("../errors/index");
@@ -242,4 +243,9 @@ exports.formatDateTime = (dateTimeString, year_only) => {
   });
   if (year_only) return year;
   return `${day} ${month}, ${year}`;
+};
+
+exports.generateUniqueId = () => {
+  const uuid = uuidv4();
+  return uuid;
 };

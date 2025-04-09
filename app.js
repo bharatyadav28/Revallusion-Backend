@@ -6,6 +6,8 @@ const pageNotFound = require("./middlewares/pageNotFound");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const Razorpay = require("razorpay");
+const { Cashfree } = require("cashfree-pg");
+
 require("express-async-errors");
 require("./utils/cronJobs.js");
 
@@ -17,6 +19,13 @@ exports.instance = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+
+// CashFree
+// exports.cashfree = new Cashfree(
+//   "SANDBOX",
+//   process.env.CASHFREE_KEY_ID,
+//   process.env.CASHFREE_KEY_SECRET
+// );
 
 // Predefined middlewares
 app.use(express.json());

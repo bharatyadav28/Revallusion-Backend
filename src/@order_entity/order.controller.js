@@ -1,4 +1,5 @@
 const StatusCodes = require("http-status-codes");
+const { Cashfree, CreateOr } = require("cashfree-pg");
 
 const { instance } = require("../../app");
 const crypto = require("crypto");
@@ -13,12 +14,20 @@ const {
   getFrontendDomain,
   isoToReadable,
   awsUrl,
+  generateUniqueId,
 } = require("../../utils/helperFuns");
 const { default: mongoose } = require("mongoose");
 const {
   sendInvoice,
 } = require("../@transaction_entity/transaction.controller");
 const { s3Uploadv4 } = require("../../utils/s3");
+// const { cashfree } = require("../../app");
+
+let cashfree = new Cashfree(
+  "SANDBOX",
+  process.env.CASHFREE_KEY_ID,
+  process.env.CASHFREE_KEY_SECRET
+);
 
 // Helper functions
 const getOrderDetails = async ({ plan, userId }) => {
@@ -93,6 +102,7 @@ const getOrderDetails = async ({ plan, userId }) => {
     amount,
     expiry_date,
     hasUpgraded,
+    user,
   };
 
   return orderDetails;
@@ -105,6 +115,8 @@ const activateSubscription = async ({
   isAuthentic,
   userId,
   razorpay_signature,
+  req,
+  res,
 }) => {
   const order = await OrderModel.findOne({
     order_id,
@@ -186,9 +198,11 @@ const activateSubscription = async ({
   } finally {
     session.endSession();
   }
+
+  const frontendDomain = getFrontendDomain(req);
+  return res.redirect(`${frontendDomain}/verify-payment`);
 };
 
-// Create a new order
 exports.createRazorpayOrder = async (req, res) => {
   const { plan } = req.body;
   const userId = req?.user?._id;
@@ -235,7 +249,6 @@ exports.getApiKey = async (req, res) => {
   });
 };
 
-// Payment verification
 exports.verifyRazorpayPayment = async (req, res) => {
   const { razorpay_payment_id, razorpay_order_id, razorpay_signature } =
     req.body;
@@ -262,10 +275,9 @@ exports.verifyRazorpayPayment = async (req, res) => {
     isAuthentic,
     userId: req.user._id,
     razorpay_signature,
+    req,
+    res,
   });
-
-  const frontendDomain = getFrontendDomain(req);
-  return res.redirect(`${frontendDomain}/verify-payment`);
 
   // return res.status(StatusCodes.OK).json({
   //   success: true,
@@ -273,7 +285,101 @@ exports.verifyRazorpayPayment = async (req, res) => {
   // });
 };
 
-// Check if user has subscrition
+exports.createCashFreeOrder = async (req, res) => {
+  const { plan } = req.body;
+  const userId = req?.user?._id;
+
+  const { existingPlan, amount, expiry_date, hasUpgraded, user } =
+    await getOrderDetails({ plan, userId });
+
+  const uuid = generateUniqueId();
+  const order_id = `cf_${uuid}`;
+
+  let request = {
+    order_amount: amount,
+    order_currency: "INR",
+    order_id,
+    customer_details: {
+      customer_id: userId,
+      customer_name: user?.name || "user",
+      customer_email: user.email,
+      customer_phone: user?.mobile || "+919999999999",
+    },
+    order_meta: {
+      return_url:
+        "https://revallusion.onrender.com/api/v1/order/cash-free/verify",
+    },
+    order_note: "",
+  };
+
+  let cashfreeData = null;
+  try {
+    const response = await cashfree.PGCreateOrder(request);
+
+    cashfreeData = response?.data;
+  } catch (error) {
+    console.error("Error setting up order request:", error.response);
+    throw new BadRequestError(error.response?.data.message);
+  }
+
+  // Save order to database
+  const query = {
+    user: userId,
+    order_id,
+    plan: existingPlan._id,
+    inr_price: amount,
+    expiry_date,
+    status: "Pending",
+    actual_price: existingPlan.inr_price,
+    hasUpgraded,
+  };
+
+  const savedOrder = await OrderModel.create(query);
+  if (!savedOrder) throw new BadRequestError("Order not created");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Order created successfully",
+    data: { order: savedOrder, cashfreeData },
+  });
+};
+
+exports.verifyCashFreePayment = async (req, res) => {
+  // const { orderId } = req.body;
+  const { orderId } = req.query;
+
+  let isAuthentic = false;
+
+  let cashfreeData = null;
+  try {
+    const response = await cashfree.PGFetchOrder(orderId);
+    cashfreeData = response?.data;
+    isAuthentic = cashfreeData.order_status === "PAID";
+    console.log("data:", cashfreeData.order_status, isAuthentic);
+  } catch (error) {
+    throw new BadRequestError(error.response?.data.message);
+  }
+
+  console.log("data", cashfreeData);
+
+  await activateSubscription({
+    order_id: orderId,
+    gateway: "Cashfree",
+    payment_id: cashfreeData.payment_session_id,
+    isAuthentic,
+    userId: req.user._id,
+    req,
+    res,
+  });
+
+  // res.status(StatusCodes.OK).json({
+  //   success: true,
+  //   message: "Order created successfully",
+  //   // data: { order: savedOrder, cashfreeData },
+  // });
+};
+
+// Check if user has subscription
 exports.hasSubscription = async (req, res) => {
   const { userId } = req.params;
 

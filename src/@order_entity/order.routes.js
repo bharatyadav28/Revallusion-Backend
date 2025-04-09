@@ -7,6 +7,8 @@ const {
   getApiKey,
   hasSubscription,
   mySubscription,
+  createCashFreeOrder,
+  verifyCashFreePayment,
 } = require("./order.controller");
 
 const router = express.Router();
@@ -15,6 +17,10 @@ const router = express.Router();
 router.route("/razor-pay").post(auth, createRazorpayOrder);
 router.route("/get-key").get(auth, getApiKey);
 router.route("/razor-pay/verify").post(auth, verifyRazorpayPayment);
+
+// Cash-free
+router.route("/cash-free").post(auth, createCashFreeOrder);
+router.route("/cash-free/verify").get(auth, verifyCashFreePayment);
 
 router.route("/has-subscription/:userId").get(hasSubscription);
 
