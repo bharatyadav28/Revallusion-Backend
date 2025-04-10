@@ -40,7 +40,9 @@ exports.getCourses = async (req, res) => {
 
 // Get courses names
 exports.getCoursesNames = async (req, res) => {
-  const courses = await courseModel.find().select("title isFree");
+  const courses = await courseModel.find().select("title isFree").sort({
+    isFree: -1,
+  });
 
   res.status(StatusCodes.OK).json({
     success: true,
