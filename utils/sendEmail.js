@@ -1,6 +1,33 @@
+const sg = require("@sendgrid/mail");
 const nodemailer = require("nodemailer");
 
+const api = process.env.SENDGRIP_API;
+sg.setApiKey(api);
+
 const sendEmail = async ({ to, subject, html, attachments }) => {
+  const isProdEnv = process.env.NODE_ENV === "production";
+
+  if (false) {
+    const mailOptions = {
+      to,
+      from: "namaskaram@stringgeo.com",
+      subject,
+      html,
+    };
+
+    if (attachments) {
+      mailOptions.attachments = attachments.map((file) => ({
+        content: file.content.toString("base64"), // Buffer to Base64
+        filename: file.filename,
+        type: file.contentType,
+        disposition: "attachment",
+      }));
+    }
+
+    // Send email using SendGrid
+    return sg.send(mailOptions);
+  }
+
   //  create tranporter(ethereal config) using nodemailer
   const devTransporter = nodemailer.createTransport({
     host: "smtp.ethereal.email",
