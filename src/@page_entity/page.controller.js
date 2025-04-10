@@ -74,7 +74,10 @@ exports.deletePage = async (req, res, next) => {
 };
 
 exports.getPricingPolicy = async (req, res, next) => {
-  const page = await PageModel.findOne({ title: "Pricing Policy" }).select({
+  const page = await PageModel.findOne({
+    title: "Pricing Policy",
+    status: "Active",
+  }).select({
     title: 1,
     description: 1,
   });
@@ -90,6 +93,7 @@ exports.getPricingPolicy = async (req, res, next) => {
 exports.getTermsAndConditions = async (req, res, next) => {
   const page = await PageModel.findOne({
     title: "Terms and Conditions",
+    status: "Active",
   }).select({
     title: 1,
     description: 1,
@@ -106,6 +110,7 @@ exports.getTermsAndConditions = async (req, res, next) => {
 exports.getPrivacyPolicy = async (req, res, next) => {
   const page = await PageModel.findOne({
     title: "Privacy Policy",
+    status: "Active",
   }).select({
     title: 1,
     description: 1,
@@ -122,6 +127,7 @@ exports.getPrivacyPolicy = async (req, res, next) => {
 exports.getRefundPolicy = async (req, res, next) => {
   const page = await PageModel.findOne({
     title: "Refund Policy",
+    status: "Active",
   }).select({
     title: 1,
     description: 1,
@@ -138,6 +144,7 @@ exports.getRefundPolicy = async (req, res, next) => {
 exports.getAboutUs = async (req, res, next) => {
   const page = await PageModel.findOne({
     title: "About Us",
+    status: "Active",
   }).select({
     title: 1,
     description: 1,

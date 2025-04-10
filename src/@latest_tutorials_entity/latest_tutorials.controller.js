@@ -88,7 +88,7 @@ exports.addVideosToTutorials = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Videos added successfully",
+    message: "Latest tutorial videos added successfully",
   });
 };
 
