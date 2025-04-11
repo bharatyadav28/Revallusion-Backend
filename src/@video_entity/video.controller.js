@@ -463,7 +463,10 @@ exports.deleteVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter video id");
   }
 
-  const video = await VideoModel.findOne({ _id: videoId, isDeleted: false });
+  const video = await VideoModel.findOne({
+    _id: videoId,
+    isDeleted: false,
+  });
   if (!video) {
     throw new BadRequestError("Video not found");
   }
@@ -504,6 +507,7 @@ exports.deleteVideo = async (req, res, next) => {
             course: null,
             submodule: null,
             module: null,
+            sequence: 0,
           },
         },
         { session }
