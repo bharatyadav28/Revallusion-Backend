@@ -7,6 +7,7 @@ const {
   isoToReadable,
   numberToWords,
   formatDateTime,
+  awsUrl,
 } = require("../../utils/helperFuns");
 const sendEmail = require("../../utils/sendEmail");
 
@@ -112,6 +113,11 @@ exports.getAllTransactions = async (req, res) => {
     },
     {
       $limit: limit,
+    },
+    {
+      $set: {
+        invoice_url: { $concat: [awsUrl, "/", "$invoice_url"] },
+      },
     },
     {
       $project: {
