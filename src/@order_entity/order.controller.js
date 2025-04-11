@@ -340,7 +340,7 @@ exports.createCashFreeOrder = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Order created successfully",
-    data: { order: savedOrder, cashfreeData },
+    data: { payment_session_id: cashfreeData.payment_session_id },
   });
 };
 

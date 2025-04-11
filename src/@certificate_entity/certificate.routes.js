@@ -12,6 +12,6 @@ const router = express.Router();
 router.route("/").post(auth, generateMyCertificate).get(auth, getCertificates);
 
 // Test
-// router.route("/create").get(createCertfifcate);
+router.route("/create").get(createCertfifcate);
 
 module.exports = router;

@@ -15,43 +15,15 @@ exports.createCertfifcate = async (req, res) => {
   const tempFilePath = path.join("test", `certficate.pdf`);
 
   const doc = new PDFDocument({
-    size: "A4", // Standard A4 size
-    margins: { top: 30, left: 30, right: 30, bottom: 30 }, // Outer margins
+    size: [1056, 816], // Width and height in points (1 point ≈ 1 px here)
   });
 
   const writeStream = fs.createWriteStream(tempFilePath);
 
-  const pageWidth = doc.page.width;
-  const pageHeight = doc.page.height;
-  const margin = 50; // Margin from outer div
+  const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
 
-  // Outer Div (Full Page)
-  doc.rect(0, 0, pageWidth, pageHeight).fill("#FFF");
-
-  // Inner Div (with some margin)
-  const innerX = margin;
-  const innerY = margin;
-  const innerWidth = pageWidth - 2 * margin;
-  const innerHeight = pageHeight - 2 * margin;
-
-  doc.fillColor("#F2EEEB").rect(innerX, innerY, innerWidth, innerHeight).fill();
-
-  // Adding some text inside the inner div
-  doc
-    .fillColor("black")
-    .fontSize(20)
-    .text("This is the my inner Div", innerX + 20, innerY + 20);
-
-  doc
-    .save() // Save the current state
-
-    .moveTo(100, 200) // Starting point (x, y)
-    .lineTo(200, 100) // Draw to second point
-    .lineTo(300, 200) // Draw to third point
-    .lineTo(100, 200) // Close the triangle
-    .fill("#ff5733") // Background color (fill)
-
-    .restore();
+  doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
+  // doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
 
   // Finalize the PDF
   doc.end();
