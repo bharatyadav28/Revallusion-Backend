@@ -307,8 +307,9 @@ exports.createCashFreeOrder = async (req, res) => {
     },
 
     order_meta: {
-      // return_url: `https://revallusion.onrender.com/api/v1/order/cash-free/verify?order_id=${order_id}`,
-      return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
+      return_url: `https://revallusion.onrender.com/api/v1/order/cash-free/verify?order_id=${order_id}`,
+      // return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
+      // return_url: `http://localhost:4000/api/v1/order/cash-free/verify?order_id=${order_id}`,
     },
   };
 
@@ -318,7 +319,6 @@ exports.createCashFreeOrder = async (req, res) => {
 
     cashfreeData = response?.data;
   } catch (error) {
-    console.error("Error setting up order request:", error.response);
     throw new BadRequestError(error.response?.data.message);
   }
 
@@ -337,8 +337,6 @@ exports.createCashFreeOrder = async (req, res) => {
   const savedOrder = await OrderModel.create(query);
   if (!savedOrder) throw new BadRequestError("Order not created");
 
-  console.log("Cash free order data:", cashfreeData);
-
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Order created successfully",
@@ -351,8 +349,6 @@ exports.verifyCashFreePayment = async (req, res) => {
   // const { orderId } = req.body;
   const { order_id: orderId } = req.query;
 
-  console.log("Order Id:", orderId);
-
   let isAuthentic = false;
 
   let cashfreeData = null;
@@ -360,12 +356,9 @@ exports.verifyCashFreePayment = async (req, res) => {
     const response = await cashfree.PGFetchOrder(orderId);
     cashfreeData = response?.data;
     isAuthentic = cashfreeData.order_status === "PAID";
-    console.log("data:", cashfreeData.order_status, isAuthentic);
   } catch (error) {
     throw new BadRequestError(error.response?.data.message);
   }
-
-  console.log("data", cashfreeData);
 
   await activateSubscription({
     order_id: orderId,
