@@ -115,8 +115,6 @@ const activateSubscription = async ({
   isAuthentic,
   userId,
   razorpay_signature,
-  req,
-  res,
 }) => {
   const order = await OrderModel.findOne({
     order_id,
@@ -151,10 +149,7 @@ const activateSubscription = async ({
 
     await Promise.all([saveTransaction, deleteOrder]);
 
-    return res.status(StatusCodes.BAD_REQUEST).json({
-      success: false,
-      message: "Payment verification failed",
-    });
+    throw new BadRequestError("Payment verification failed");
   }
 
   const session = await mongoose.startSession();
@@ -198,9 +193,6 @@ const activateSubscription = async ({
   } finally {
     session.endSession();
   }
-
-  const frontendDomain = getFrontendDomain(req);
-  return res.redirect(`${frontendDomain}/verify-payment`);
 };
 
 exports.createRazorpayOrder = async (req, res) => {
@@ -275,9 +267,10 @@ exports.verifyRazorpayPayment = async (req, res) => {
     isAuthentic,
     userId: req.user._id,
     razorpay_signature,
-    req,
-    res,
   });
+
+  const frontendDomain = getFrontendDomain(req);
+  return res.redirect(`${frontendDomain}/verify-payment`);
 
   // return res.status(StatusCodes.OK).json({
   //   success: true,
@@ -294,6 +287,8 @@ exports.createCashFreeOrder = async (req, res) => {
 
   const uuid = generateUniqueId();
   const order_id = `cf_${uuid}`;
+  const frontendDomain = getFrontendDomain(req);
+  console.log("Frontend domain: ", frontendDomain);
 
   let request = {
     order_amount: amount,
@@ -307,9 +302,7 @@ exports.createCashFreeOrder = async (req, res) => {
     },
 
     order_meta: {
-      // return_url: `https://revallusion.onrender.com/api/v1/order/cash-free/verify?order_id=${order_id}`,
-      return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
-      // return_url: `http://localhost:4000/api/v1/order/cash-free/verify?order_id=${order_id}`,
+      return_url: `${frontendDomain}/verify-payment?order_id=${order_id}`,
     },
   };
 
@@ -346,8 +339,11 @@ exports.createCashFreeOrder = async (req, res) => {
 };
 
 exports.verifyCashFreePayment = async (req, res) => {
-  // const { orderId } = req.body;
   const { order_id: orderId } = req.query;
+
+  if (!orderId) {
+    throw new BadRequestError("Please enter order id");
+  }
 
   let isAuthentic = false;
 
@@ -366,15 +362,13 @@ exports.verifyCashFreePayment = async (req, res) => {
     payment_id: cashfreeData.cf_order_id,
     isAuthentic,
     userId: req.user._id,
-    req,
-    res,
   });
 
-  // res.status(StatusCodes.OK).json({
-  //   success: true,
-  //   message: "Order created successfully",
-  //   // data: { order: savedOrder, cashfreeData },
-  // });
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Payment verified successfully",
+    // data: { order: savedOrder, cashfreeData },
+  });
 };
 
 // Check if user has subscription
