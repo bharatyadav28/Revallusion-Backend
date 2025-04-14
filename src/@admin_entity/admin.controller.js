@@ -522,7 +522,10 @@ exports.updateUser = async (req, res) => {
     throw new BadRequestError("Email cannot be empty");
   }
 
-  const existingUserPromise = userModel.findOne({ email });
+  const existingUserPromise = userModel.findOne({
+    _id: userId,
+    isDeleted: false,
+  });
   const existingCertificatesPromise = CertificateModel.find({
     user: userId,
   });
