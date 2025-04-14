@@ -307,8 +307,8 @@ exports.createCashFreeOrder = async (req, res) => {
     },
 
     order_meta: {
-      return_url: `https://revallusion.onrender.com/api/v1/order/cash-free/verify?order_id=${order_id}`,
-      // return_url: `http://localhost:4000/api/v1/order/cash-free/verify?order_id=${order_id}`,
+      // return_url: `https://revallusion.onrender.com/api/v1/order/cash-free/verify?order_id=${order_id}`,
+      return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
     },
   };
 
