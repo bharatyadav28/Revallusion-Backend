@@ -47,6 +47,27 @@ app.use(cookieParser(process.env.COOKIE_SECRET));
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.urlencoded({ extended: true }));
 
+const morgan = require("morgan");
+
+const istLogger = morgan((tokens, req, res) => {
+  const istTime = new Date().toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour12: false,
+  });
+
+  return [
+    `[${istTime}]`,
+    tokens.method(req, res),
+    tokens.url(req, res),
+    tokens.status(req, res),
+    "-",
+    tokens["response-time"](req, res),
+    "ms",
+  ].join(" ");
+});
+
+app.use(istLogger);
+
 app.get("/", (req, res, next) =>
   res.sendFile(path.join(__dirname, "public", "index.html"))
 );
