@@ -20,7 +20,7 @@ router.route("/razor-pay/verify").post(auth, verifyRazorpayPayment);
 
 // Cash-free
 router.route("/cash-free").post(auth, createCashFreeOrder);
-router.route("/cash-free/verify").get(auth, verifyCashFreePayment);
+router.route("/cash-free/verify").get(verifyCashFreePayment);
 
 router.route("/has-subscription/:userId").get(hasSubscription);
 
