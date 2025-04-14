@@ -305,11 +305,11 @@ exports.createCashFreeOrder = async (req, res) => {
       customer_email: user.email,
       customer_phone: user?.mobile || "+919999999999",
     },
+
     order_meta: {
       return_url:
         "https://revallusion.onrender.com/api/v1/order/cash-free/verify",
     },
-    order_note: "",
   };
 
   let cashfreeData = null;
@@ -341,12 +341,15 @@ exports.createCashFreeOrder = async (req, res) => {
     success: true,
     message: "Order created successfully",
     data: { payment_session_id: cashfreeData.payment_session_id },
+    // data: { cashfreeData },
   });
 };
 
 exports.verifyCashFreePayment = async (req, res) => {
   // const { orderId } = req.body;
   const { orderId } = req.query;
+
+  console.log("Order Id:", orderId);
 
   let isAuthentic = false;
 
@@ -365,7 +368,7 @@ exports.verifyCashFreePayment = async (req, res) => {
   await activateSubscription({
     order_id: orderId,
     gateway: "Cashfree",
-    payment_id: cashfreeData.payment_session_id,
+    payment_id: cashfreeData.cf_order_id,
     isAuthentic,
     userId: req.user._id,
     req,
