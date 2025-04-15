@@ -1,5 +1,4 @@
 const StatusCodes = require("http-status-codes");
-const { Cashfree, CreateOr } = require("cashfree-pg");
 
 const { instance } = require("../../app");
 const crypto = require("crypto");
@@ -22,12 +21,6 @@ const {
 } = require("../@transaction_entity/transaction.controller");
 const { s3Uploadv4 } = require("../../utils/s3");
 // const { cashfree } = require("../../app");
-
-let cashfree = new Cashfree(
-  "SANDBOX",
-  process.env.CASHFREE_KEY_ID,
-  process.env.CASHFREE_KEY_SECRET
-);
 
 // Helper functions
 const getOrderDetails = async ({ plan, userId }) => {
@@ -288,7 +281,6 @@ exports.createCashFreeOrder = async (req, res) => {
   const uuid = generateUniqueId();
   const order_id = `cf_${uuid}`;
   const frontendDomain = getFrontendDomain(req);
-  console.log("Frontend domain: ", frontendDomain);
 
   let request = {
     order_amount: amount,
@@ -303,17 +295,27 @@ exports.createCashFreeOrder = async (req, res) => {
 
     order_meta: {
       return_url: `${frontendDomain}/verify-payment?order_id=${order_id}`,
+
+      // return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
     },
   };
 
-  let cashfreeData = null;
-  try {
-    const response = await cashfree.PGCreateOrder(request);
+  const response = await fetch(`${process.env.CF_BASE_URL}/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-version": "2023-08-01",
+      "x-client-id": process.env.CASHFREE_KEY_ID,
+      "x-client-secret": process.env.CASHFREE_KEY_SECRET,
+    },
+    body: JSON.stringify(request),
+  });
 
-    cashfreeData = response?.data;
-  } catch (error) {
-    throw new BadRequestError(error.response?.data.message);
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error?.message || "Payment failed");
   }
+  const cashfreeData = await response.json();
 
   // Save order to database
   const query = {
@@ -334,27 +336,34 @@ exports.createCashFreeOrder = async (req, res) => {
     success: true,
     message: "Order created successfully",
     data: { payment_session_id: cashfreeData.payment_session_id },
-    // data: { cashfreeData },
   });
 };
 
 exports.verifyCashFreePayment = async (req, res) => {
   const { order_id: orderId } = req.query;
-
   if (!orderId) {
     throw new BadRequestError("Please enter order id");
   }
 
   let isAuthentic = false;
 
-  let cashfreeData = null;
-  try {
-    const response = await cashfree.PGFetchOrder(orderId);
-    cashfreeData = response?.data;
-    isAuthentic = cashfreeData.order_status === "PAID";
-  } catch (error) {
-    throw new BadRequestError(error.response?.data.message);
+  const response = await fetch(`${process.env.CF_BASE_URL}/orders/${orderId}`, {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-version": "2023-08-01",
+      "x-client-id": process.env.CASHFREE_KEY_ID,
+      "x-client-secret": process.env.CASHFREE_KEY_SECRET,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error?.message || "Payment failed");
   }
+  const cashfreeData = await response.json();
+
+  isAuthentic = cashfreeData.order_status === "PAID";
 
   await activateSubscription({
     order_id: orderId,
@@ -367,7 +376,6 @@ exports.verifyCashFreePayment = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Payment verified successfully",
-    // data: { order: savedOrder, cashfreeData },
   });
 };
 
