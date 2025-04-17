@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const mongoose = require("mongoose");
 const PDFDocument = require("pdfkit");
 const { StatusCodes } = require("http-status-codes");
 
@@ -9,9 +10,11 @@ const PlanModel = require("../@plan_entity/plan.model.js");
 const CourseModel = require("../@course_entity/course.model");
 const VideoModel = require("../@video_entity/video.model.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
+const { s3Uploadv4 } = require("../../utils/s3.js");
+const { CostExplorer } = require("aws-sdk");
 
 // Test
-exports.createCertfifcate = async (req, res) => {
+exports.createCertfifcateTest = async (req, res) => {
   const tempFilePath = path.join("test", `certficate.pdf`);
 
   const doc = new PDFDocument({
@@ -33,6 +36,67 @@ exports.createCertfifcate = async (req, res) => {
     success: true,
     message: "Certificate created successfully",
   });
+};
+
+const createCertificateBuffer = async ({
+  user,
+  averageAssigmentsScore,
+  activePlan,
+}) => {
+  return new Promise((resolve, reject) => {
+    const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
+
+    const doc = new PDFDocument({
+      size: [1056, 816],
+    });
+
+    const writeStream = fs.createWriteStream(tempFilePath);
+
+    const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
+
+    doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
+    // doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
+
+    writeStream.on("finish", () => {
+      fs.readFile(tempFilePath, async (err, data) => {
+        if (err) {
+          console.log("Error", data, err);
+        } else {
+          try {
+            // Send email
+            fs.unlink(tempFilePath, (err) => {});
+            resolve(data);
+          } catch (error) {
+            console.log(error);
+            res.status(400).send({ message: "something went wrong" });
+            // reject({error:"Something went wrong"});
+          }
+        }
+      });
+    });
+
+    // Finalize the PDF
+    doc.end();
+    doc.pipe(writeStream);
+  });
+};
+
+const createCertififcate = async ({
+  user,
+  totalAssignments,
+  scoresSum,
+  averageAssigmentsScore,
+  activePlan,
+}) => {
+  const data = await createCertificateBuffer({
+    user,
+    averageAssigmentsScore,
+  });
+
+  const result = await s3Uploadv4(data, "certificates", "invoice");
+  const certificatePath = result?.Key;
+
+  return certificatePath;
 };
 
 // Helper function for progress calculation
@@ -187,21 +251,28 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
   const { inCompleteVideos, totalAssignments, scoresSum, unGradedAssignments } =
     progress[0];
 
-  if (!isAdmin && inCompleteVideos > 0) {
-    const errorText =
-      inCompleteVideos === 1 ? "1 video is" : `${inCompleteVideos} videos  are`;
-    throw new BadRequestError(`${errorText} not complete`);
+  if (!isAdmin && (inCompleteVideos > 0 || unGradedAssignments > 0)) {
+    return {
+      progress: null,
+      averageAssigmentsScore: null,
+    };
   }
 
-  if (!isAdmin && unGradedAssignments > 0) {
-    const errorText =
-      unGradedAssignments === 1
-        ? "1 assignment is"
-        : `${inCompleteVideos} assignments  are`;
-    throw new BadRequestError(
-      `${errorText} either not submitted by you or not graded by mentor`
-    );
-  }
+  // if (!isAdmin && inCompleteVideos > 0) {
+  //   const errorText =
+  //     inCompleteVideos === 1 ? "1 video is" : `${inCompleteVideos} videos  are`;
+  //   throw new BadRequestError(`${errorText} not complete`);
+  // }
+
+  // if (!isAdmin && unGradedAssignments > 0) {
+  //   const errorText =
+  //     unGradedAssignments === 1
+  //       ? "1 assignment is"
+  //       : `${inCompleteVideos} assignments  are`;
+  //   throw new BadRequestError(
+  //     `${errorText} either not submitted by you or not graded by mentor`
+  //   );
+  // }
 
   let averageAssigmentsScore = 0;
 
@@ -209,15 +280,15 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
     averageAssigmentsScore = (scoresSum / totalAssignments).toFixed(2);
   }
 
-  const certificate = await CertificateModel.create({
-    plan: activePlan._id,
-    user,
-    path: "/test",
-  });
+  // const certificate = await CertificateModel.create({
+  //   plan: activePlan._id,
+  //   user,
+  //   path: "/test",
+  // });
 
-  if (!certificate) {
-    throw new BadRequestError("Certificate creation failed");
-  }
+  // if (!certificate) {
+  //   throw new BadRequestError("Certificate creation failed");
+  // }
 
   return {
     progress,
@@ -225,46 +296,116 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
   };
 };
 
+// Save user progress on course completion when admin updates score of final assignment
+exports.saveUserProgress = async (userId) => {
+  const [activeOrder] = await OrderModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        status: "Active",
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        localField: "plan",
+        foreignField: "_id",
+        as: "plan",
+      },
+    },
+    {
+      $set: {
+        plan: { $arrayElemAt: ["$plan", 0] },
+      },
+    },
+  ]);
+
+  if (activeOrder) {
+    const activePlan = activeOrder.plan;
+    const user = { _id: activeOrder.user };
+
+    const { progress, averageAssigmentsScore } = await calculateProgress({
+      user,
+      activePlan,
+      isAdmin: false,
+    });
+
+    if (progress && averageAssigmentsScore) {
+      await CertificateModel.create({
+        user: userId,
+        plan: activePlan,
+        averageAssigmentsScore,
+        totalAssignments: progress[0].totalAssignments,
+        scoresSum: progress[0].scoresSum,
+      });
+    }
+  }
+};
+
 // By user
 exports.generateMyCertificate = async (req, res) => {
-  const { name } = req.body;
-
+  const { name, planId } = req.body;
   const userId = req.user._id;
 
-  const activeOrder = await OrderModel.findOne({
+  if (!name) throw new BadRequestError("Please provide name");
+  if (!planId) throw new BadRequestError("Please enter plan id");
+
+  const alreadyExistsPromise = CertificateModel.findOne({
     user: userId,
-    status: "Active",
-  }).populate({
-    path: "plan",
-    select: "plan_type level",
+    plan: planId,
+    isIssued: true,
   });
-  if (!activeOrder) {
-    throw new NotFoundError("You don't have any active plan");
+
+  const currentCertificatePromise = CertificateModel.findOne({
+    user: userId,
+    plan: planId,
+    isIssued: false,
+  });
+
+  const [alreadyExists, currentCertificate] = await Promise.all([
+    alreadyExistsPromise,
+    currentCertificatePromise,
+  ]);
+
+  if (!currentCertificate && alreadyExists) {
+    throw new BadRequestError("Certificate already issued");
   }
 
-  const activePlan = activeOrder.plan;
+  if (!currentCertificate) {
+    throw new BadRequestError("Please complete the course first");
+  }
 
-  const user = req.user;
-  user.name = name;
-
-  const result = await calculateProgress({
-    user,
-    activePlan,
-    isAdmin: false,
+  const certificatePath = await createCertififcate({
+    user: userId,
+    totalAssignments: currentCertificate.totalAssignments,
+    scoresSum: currentCertificate.scoresSum,
+    averageAssigmentsScore: currentCertificate.averageAssigmentsScore,
+    activePlan: currentCertificate.activePlan,
   });
+
+  let deletePreviousPromise = null;
+  if (alreadyExists) {
+    deletePreviousPromise = alreadyExists.delete();
+    // throw new BadRequestError("Certificate Already exists");
+  }
+
+  currentCertificate.path = certificatePath;
+  currentCertificate.isIssued = true;
+  const saveCurrentPromise = currentCertificate.save();
+
+  await Promise.all([deletePreviousPromise, saveCurrentPromise]);
 
   return res.status(StatusCodes.OK).json({
     success: true,
-    message: "Certificate created successfully",
-    data: {
-      ...result,
-    },
+    message: "Certificate issued successfully",
   });
 };
 
-// By admin (Helper fun)
+// TODO: By admin (Helper fun)
 exports.generateUserCertificates = async ({ plans, user }) => {
   const progressPromises = [];
+
+  console.log("Plans", plans);
 
   plans?.forEach((plan) => {
     const promise = calculateProgress({
@@ -275,9 +416,22 @@ exports.generateUserCertificates = async ({ plans, user }) => {
     progressPromises.push(promise);
   });
 
-  const progress = await Promise.all(progressPromises);
+  const progresses = await Promise.all(progressPromises);
 
-  console.log("Progress", progress);
+  console.log("Progress", progresses);
+  const createCertfificatePromises = [];
+  // progresses.forEach(async(progress)=>{
+  //   if (progress && averageAssigmentsScore) {
+  //     await CertificateModel.create({
+  //       user: user._id,
+  //       plan: activePlan,
+  //       averageAssigmentsScore,
+  //       totalAssignments: progress[0].totalAssignments,
+  //       scoresSum: progress[0].scoresSum,
+  //     });
+  //   }
+  // })
+
   return progress;
 };
 

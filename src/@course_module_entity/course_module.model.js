@@ -1,18 +1,23 @@
 const mongoose = require("mongoose");
 
-const ModuleSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: [true, "Please enter module name"],
-    trim: true,
+const ModuleSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Please enter module name"],
+      trim: true,
+    },
+    thumbnailUrl: String,
+    course: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Course",
+      required: true,
+    },
   },
-  thumbnailUrl: String,
-  course: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "Course",
-    required: true,
-  },
-});
+  {
+    timestamps: true,
+  }
+);
 
 // ModuleSchema.index({ course: 1, sequence: 1 }, { unique: true });
 

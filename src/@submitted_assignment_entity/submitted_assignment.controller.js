@@ -16,6 +16,10 @@ const {
 
 const { s3Uploadv4 } = require("../../utils/s3");
 const PlanModel = require("../@plan_entity/plan.model");
+const {
+  generateAutoCertificate,
+  saveUserProgress,
+} = require("../@certificate_entity/certificate.controller");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
   // Upload image or document file only
@@ -103,12 +107,15 @@ exports.updateScore = async (req, res) => {
   const { score } = req.body;
 
   const assignment = await SubmittedAssignmentModel.findOneAndUpdate(
-    { _id: id },
+    { _id: id, isRevoked: false },
     { score, gradedAt: Date.now() }
   );
   if (!assignment) {
     throw new NotFoundError("Assignment not found");
   }
+
+  // On course and assigments completion
+  await saveUserProgress(assignment.user);
 
   return res.status(StatusCodes.OK).json({
     success: true,
