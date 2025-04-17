@@ -11,7 +11,8 @@ const CourseModel = require("../@course_entity/course.model");
 const VideoModel = require("../@video_entity/video.model.js");
 const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const { s3Uploadv4 } = require("../../utils/s3.js");
-const { CostExplorer } = require("aws-sdk");
+const sendEmail = require("../../utils/sendEmail");
+const userModel = require("../@user_entity/user.model.js");
 
 // Test
 exports.createCertfifcateTest = async (req, res) => {
@@ -26,7 +27,45 @@ exports.createCertfifcateTest = async (req, res) => {
   const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
 
   doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
-  // doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
+
+  doc.font("Times-Roman");
+
+  doc
+    .fillColor("#000000") // Default color for most text
+    .opacity(0.65)
+    .fontSize(25)
+    .text("This certificate is proudly presented to ", 140, 290, {
+      continued: true,
+      lineGap: 8,
+    })
+    .opacity(1)
+    .text("Ravali Kandregula", { continued: true })
+    .opacity(0.65)
+    .text(" for successfully completing the ", { continued: true })
+    .fillColor("#4486F4")
+    .opacity(1) // Default color for most text
+    .text("Advance Video Editing along with Motion Graphics ", {
+      continued: true,
+    })
+    .fillColor("#000000")
+    .opacity(0.65)
+    .text("offered by ", { continued: true })
+    .opacity(1)
+    .text("Ravallusion Academy.", { continued: true })
+    .opacity(0.7)
+    .text(
+      "We thank you for your exceptional efforts and wish you the best of luck in your future."
+    );
+
+  doc
+    .fillColor("#000000") // Default color for most text
+    .opacity(0.65)
+    .fontSize(18)
+    .text("Issued on: ", 400, 470, {
+      continued: true,
+    })
+    .opacity(1)
+    .text("October 18, 2022");
 
   // Finalize the PDF
   doc.end();
@@ -47,7 +86,7 @@ const createCertificateBuffer = async ({
     const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
 
     const doc = new PDFDocument({
-      size: [1056, 816],
+      size: [1056, 816], // Width and height in points (1 point ≈ 1 px here)
     });
 
     const writeStream = fs.createWriteStream(tempFilePath);
@@ -55,7 +94,50 @@ const createCertificateBuffer = async ({
     const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
 
     doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
-    // doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
+
+    doc.font("Times-Roman");
+
+    doc
+      .fillColor("#000000")
+      .opacity(0.65)
+      .fontSize(25)
+      .text("This certificate is proudly presented to ", 140, 290, {
+        continued: true,
+        lineGap: 8,
+      })
+      .opacity(1)
+      .text(`${user?.name || User} `, { continued: true })
+      .opacity(0.65)
+      .text(`for successfully completing the `, {
+        continued: true,
+      })
+      .fillColor("#4486F4")
+      .opacity(1)
+      .text(
+        `${activePlan.plan_type} Video Editing along with Motion Graphics `,
+        {
+          continued: true,
+        }
+      )
+      .fillColor("#000000")
+      .opacity(0.65)
+      .text("offered by ", { continued: true })
+      .opacity(1)
+      .text("Ravallusion Academy. ", { continued: true })
+      .opacity(0.7)
+      .text(
+        "We thank you for your exceptional efforts and wish you the best of luck in your future."
+      );
+
+    doc
+      .fillColor("#000000")
+      .opacity(0.65)
+      .fontSize(18)
+      .text("Issued on: ", 400, 470, {
+        continued: true,
+      })
+      .opacity(1)
+      .text("October 18, 2022");
 
     writeStream.on("finish", () => {
       fs.readFile(tempFilePath, async (err, data) => {
@@ -63,12 +145,30 @@ const createCertificateBuffer = async ({
           console.log("Error", data, err);
         } else {
           try {
-            // Send email
+            // Todo:Send email
+            const attachments = [
+              {
+                filename: `certificate.pdf`,
+                path: tempFilePath,
+                content: data.toString("base64"),
+                encoding: "base64",
+              },
+            ];
+
+            console.log("user", user);
+
+            await sendEmail({
+              to: user.email,
+              subject: "Certificate",
+              html: "Testing certififcate",
+              attachments,
+            });
+
             fs.unlink(tempFilePath, (err) => {});
             resolve(data);
           } catch (error) {
             console.log(error);
-            res.status(400).send({ message: "something went wrong" });
+            // res.status(400).send({ message: "something went wrong" });
             // reject({error:"Something went wrong"});
           }
         }
@@ -91,6 +191,7 @@ const createCertififcate = async ({
   const data = await createCertificateBuffer({
     user,
     averageAssigmentsScore,
+    activePlan,
   });
 
   const result = await s3Uploadv4(data, "certificates", "invoice");
@@ -362,10 +463,19 @@ exports.generateMyCertificate = async (req, res) => {
     isIssued: false,
   });
 
-  const [alreadyExists, currentCertificate] = await Promise.all([
-    alreadyExistsPromise,
-    currentCertificatePromise,
-  ]);
+  const userPromise = userModel.findById(userId).select("email name");
+
+  // console.log("cuetrent pto", currentCertificatePromise);
+
+  const existingPlanPromise = PlanModel.findById(planId);
+
+  const [alreadyExists, currentCertificate, existingPlan, user] =
+    await Promise.all([
+      alreadyExistsPromise,
+      currentCertificatePromise,
+      existingPlanPromise,
+      userPromise,
+    ]);
 
   if (!currentCertificate && alreadyExists) {
     throw new BadRequestError("Certificate already issued");
@@ -376,16 +486,16 @@ exports.generateMyCertificate = async (req, res) => {
   }
 
   const certificatePath = await createCertififcate({
-    user: userId,
+    user,
     totalAssignments: currentCertificate.totalAssignments,
     scoresSum: currentCertificate.scoresSum,
     averageAssigmentsScore: currentCertificate.averageAssigmentsScore,
-    activePlan: currentCertificate.activePlan,
+    activePlan: existingPlan,
   });
 
   let deletePreviousPromise = null;
   if (alreadyExists) {
-    deletePreviousPromise = alreadyExists.delete();
+    deletePreviousPromise = alreadyExists.deleteOne();
     // throw new BadRequestError("Certificate Already exists");
   }
 
@@ -404,8 +514,6 @@ exports.generateMyCertificate = async (req, res) => {
 // TODO: By admin (Helper fun)
 exports.generateUserCertificates = async ({ plans, user }) => {
   const progressPromises = [];
-
-  console.log("Plans", plans);
 
   plans?.forEach((plan) => {
     const promise = calculateProgress({
