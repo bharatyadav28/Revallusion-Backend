@@ -449,3 +449,93 @@ exports.getCertificates = async (req, res) => {
     },
   });
 };
+
+exports.leaderBoard = async (req, res) => {
+  let { search, from, to, currentPage } = req.query;
+
+  const query1 = {};
+  search = search?.trim();
+  if (search) {
+    const searchRegExp = new RegExp(search, "i");
+    query1.$or = [
+      { "user.name": { $regex: searchRegExp } },
+      { "user.email": { $regex: searchRegExp } },
+    ];
+  }
+
+  const query2 = { isIssued: true };
+  if (from || to) {
+    query2.createdAt = {};
+    if (from) query2.createdAt.$gte = new Date(from);
+    if (to) {
+      const endOfDay = new Date(to);
+      // Includes whole day
+      endOfDay.setHours(23, 59, 59, 999);
+      query2.createdAt.$lte = endOfDay;
+    }
+  }
+
+  const page = currentPage || 1;
+  const limit = 8;
+  const skip = (page - 1) * limit;
+
+  const usersCompletedCourse = await CertificateModel.aggregate([
+    {
+      $match: query2,
+    },
+    {
+      $sort: {
+        averageAssigmentsScore: 1,
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $lookup: {
+        from: "users",
+        let: { userId: "$user" },
+
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$userId"] },
+            },
+          },
+          {
+            $project: {
+              name: 1,
+              email: 1,
+            },
+          },
+        ],
+
+        as: "user",
+      },
+    },
+    {
+      $match: query1,
+    },
+    {
+      $set: {
+        user: { $arrayElemAt: ["$user", 0] },
+      },
+    },
+    {
+      $project: {
+        user: 1,
+        scoresSum: 1,
+        averageAssigmentsScore: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Leader board fetched successfully",
+    data: {
+      leaderBoard: usersCompletedCourse,
+    },
+  });
+};
