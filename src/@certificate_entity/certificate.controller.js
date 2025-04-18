@@ -14,6 +14,7 @@ const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const { s3Uploadv4 } = require("../../utils/s3.js");
 const sendEmail = require("../../utils/sendEmail");
 const userModel = require("../@user_entity/user.model.js");
+const { formatDateTime } = require("../../utils/helperFuns.js");
 
 // Test
 exports.createCertfifcateTest = async (req, res) => {
@@ -93,149 +94,6 @@ exports.createCertfifcateTest = async (req, res) => {
     success: true,
     message: "Certificate created successfully",
   });
-};
-
-const createCertificateBuffer = async ({
-  user,
-  averageAssigmentsScore,
-  activePlan,
-  certificateId,
-}) => {
-  const verifyUrl = `${process.env.FRONTEND_URL}/certificate/${certificateId}`;
-  // Generate the QR code as a data URL
-  const qrCodeDataURL = await QRCode.toDataURL(verifyUrl, {
-    errorCorrectionLevel: "H",
-    margin: 1,
-    // width: 00,
-    color: {
-      dark: "#000",
-      light: "#fff",
-    },
-  });
-
-  return new Promise((resolve, reject) => {
-    const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
-
-    const doc = new PDFDocument({
-      size: [1056, 816], // Width and height in points (1 point ≈ 1 px here)
-    });
-
-    const writeStream = fs.createWriteStream(tempFilePath);
-
-    const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
-
-    doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
-
-    doc.font("Times-Roman");
-
-    doc
-      .fillColor("#000000")
-      .opacity(0.65)
-      .fontSize(25)
-      .text("This certificate is proudly presented to ", 140, 290, {
-        continued: true,
-        lineGap: 8,
-      })
-      .opacity(1)
-      .text(`${user?.name || "User"} `, { continued: true })
-      .opacity(0.65)
-      .text(`for successfully completing the `, {
-        continued: true,
-      })
-      .fillColor("#4486F4")
-      .opacity(1)
-      .text(
-        `${activePlan.plan_type} Video Editing along with Motion Graphics `,
-        {
-          continued: true,
-        }
-      )
-      .fillColor("#000000")
-      .opacity(0.65)
-      .text("offered by ", { continued: true })
-      .opacity(1)
-      .text("Ravallusion Academy. ", { continued: true })
-      .opacity(0.7)
-      .text(
-        "We thank you for your exceptional efforts and wish you the best of luck in your future."
-      );
-
-    doc
-      .fillColor("#000000")
-      .opacity(0.65)
-      .fontSize(18)
-      .text("Issued on: ", 400, 470, {
-        continued: true,
-      })
-      .opacity(1)
-      .text("October 18, 2022");
-
-    // Add the QR code to the PDF
-    doc.image(qrCodeDataURL, 90, 630, {
-      width: 90,
-    });
-
-    writeStream.on("finish", () => {
-      fs.readFile(tempFilePath, async (err, data) => {
-        if (err) {
-          console.log("Error", data, err);
-        } else {
-          try {
-            // Todo:Send email
-            const attachments = [
-              {
-                filename: `certificate.pdf`,
-                path: tempFilePath,
-                content: data.toString("base64"),
-                encoding: "base64",
-              },
-            ];
-
-            console.log("user", user);
-
-            await sendEmail({
-              to: user.email,
-              subject: "Certificate",
-              html: "Testing certififcate",
-              attachments,
-            });
-
-            fs.unlink(tempFilePath, (err) => {});
-            resolve(data);
-          } catch (error) {
-            console.log(error);
-            // res.status(400).send({ message: "something went wrong" });
-            // reject({error:"Something went wrong"});
-          }
-        }
-      });
-    });
-
-    // Finalize the PDF
-    doc.end();
-    doc.pipe(writeStream);
-  });
-};
-
-const createCertififcate = async ({
-  user,
-  totalAssignments,
-  scoresSum,
-  averageAssigmentsScore,
-  activePlan,
-  certificateId,
-}) => {
-  const data = await createCertificateBuffer({
-    user,
-    averageAssigmentsScore,
-    activePlan,
-    certificateId,
-  });
-
-  const result = await s3Uploadv4(data, "certificates", "invoice");
-  const certificatePath = result?.Key;
-
-  return certificatePath;
 };
 
 // Helper function for progress calculation
@@ -397,41 +255,16 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
     };
   }
 
-  // if (!isAdmin && inCompleteVideos > 0) {
-  //   const errorText =
-  //     inCompleteVideos === 1 ? "1 video is" : `${inCompleteVideos} videos  are`;
-  //   throw new BadRequestError(`${errorText} not complete`);
-  // }
-
-  // if (!isAdmin && unGradedAssignments > 0) {
-  //   const errorText =
-  //     unGradedAssignments === 1
-  //       ? "1 assignment is"
-  //       : `${inCompleteVideos} assignments  are`;
-  //   throw new BadRequestError(
-  //     `${errorText} either not submitted by you or not graded by mentor`
-  //   );
-  // }
-
   let averageAssigmentsScore = 0;
 
   if (totalAssignments > 0) {
     averageAssigmentsScore = (scoresSum / totalAssignments).toFixed(2);
   }
 
-  // const certificate = await CertificateModel.create({
-  //   plan: activePlan._id,
-  //   user,
-  //   path: "/test",
-  // });
-
-  // if (!certificate) {
-  //   throw new BadRequestError("Certificate creation failed");
-  // }
-
   return {
     progress,
     averageAssigmentsScore,
+    plan: activePlan,
   };
 };
 
@@ -481,11 +314,127 @@ exports.saveUserProgress = async (userId) => {
   }
 };
 
-// By user
-exports.generateMyCertificate = async (req, res) => {
-  const { name, planId } = req.body;
-  const userId = req.user._id;
+const createCertificateBuffer = async ({
+  user,
+  averageAssigmentsScore,
+  activePlan,
+  certificateId,
+}) => {
+  const verifyUrl = `${process.env.FRONTEND_URL}/certificate/${certificateId}`;
+  // Generate the QR code as a data URL
+  const qrCodeDataURL = await QRCode.toDataURL(verifyUrl, {
+    errorCorrectionLevel: "H",
+    margin: 1,
+    // width: 00,
+    color: {
+      dark: "#000",
+      light: "#fff",
+    },
+  });
 
+  return new Promise((resolve, reject) => {
+    const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
+
+    const doc = new PDFDocument({
+      size: [1056, 816], // Width and height in points (1 point ≈ 1 px here)
+    });
+
+    const writeStream = fs.createWriteStream(tempFilePath);
+
+    const imagePath = path.join(__dirname, "../../public", "/certificate.jpg");
+
+    doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
+
+    doc.font("Times-Roman");
+
+    doc
+      .fillColor("#000000")
+      .opacity(0.65)
+      .fontSize(25)
+      .text("This certificate is proudly presented to ", 140, 290, {
+        continued: true,
+        lineGap: 8,
+      })
+      .opacity(1)
+      .text(`${user?.name || "User"} `, { continued: true })
+      .opacity(0.65)
+      .text(`for successfully completing the `, {
+        continued: true,
+      })
+      .fillColor("#4486F4")
+      .opacity(1)
+      .text(
+        `${activePlan.plan_type} Video Editing along with Motion Graphics `,
+        {
+          continued: true,
+        }
+      )
+      .fillColor("#000000")
+      .opacity(0.65)
+      .text("offered by ", { continued: true })
+      .opacity(1)
+      .text("Ravallusion Academy. ", { continued: true })
+      .opacity(0.7)
+      .text(
+        "We thank you for your exceptional efforts and wish you the best of luck in your future."
+      );
+
+    doc
+      .fillColor("#000000")
+      .opacity(0.65)
+      .fontSize(18)
+      .text("Issued on: ", 400, 470, {
+        continued: true,
+      })
+      .opacity(1)
+      .text(formatDateTime(new Date()));
+
+    // Add the QR code to the PDF
+    doc.image(qrCodeDataURL, 90, 630, {
+      width: 90,
+    });
+
+    writeStream.on("finish", () => {
+      fs.readFile(tempFilePath, async (err, data) => {
+        if (err) {
+          console.log("Error", data, err);
+        } else {
+          try {
+            // Todo:Send email
+            const attachments = [
+              {
+                filename: `certificate.pdf`,
+                path: tempFilePath,
+                content: data.toString("base64"),
+                encoding: "base64",
+              },
+            ];
+
+            await sendEmail({
+              to: user.email,
+              subject: "Certificate",
+              html: "Testing certififcate",
+              attachments,
+            });
+
+            fs.unlink(tempFilePath, (err) => {});
+            resolve(data);
+          } catch (error) {
+            console.log(error);
+            // res.status(400).send({ message: "something went wrong" });
+            // reject({error:"Something went wrong"});
+          }
+        }
+      });
+    });
+
+    // Finalize the PDF
+    doc.end();
+    doc.pipe(writeStream);
+  });
+};
+
+const createCertificate = async ({ name, planId, userId, isAdmin }) => {
   if (!name) throw new BadRequestError("Please provide name");
   if (!planId) throw new BadRequestError("Please enter plan id");
 
@@ -505,7 +454,7 @@ exports.generateMyCertificate = async (req, res) => {
 
   const existingPlanPromise = PlanModel.findById(planId);
 
-  const [alreadyExists, currentCertificate, existingPlan, user] =
+  let [alreadyExists, currentCertificate, existingPlan, user] =
     await Promise.all([
       alreadyExistsPromise,
       currentCertificatePromise,
@@ -518,17 +467,35 @@ exports.generateMyCertificate = async (req, res) => {
   }
 
   if (!currentCertificate) {
-    throw new BadRequestError("Please complete the course first");
+    if (!isAdmin) {
+      throw new BadRequestError("Please complete the course first");
+    } else {
+      const progressResult = await calculateProgress({
+        user,
+        activePlan: existingPlan,
+        isAdmin: true,
+      });
+
+      const { progress, averageAssigmentsScore } = progressResult;
+      currentCertificate = await CertificateModel.create({
+        user: userId,
+        plan: existingPlan._id,
+        averageAssigmentsScore,
+        totalAssignments: progress[0].totalAssignments,
+        scoresSum: progress[0].scoresSum,
+      });
+    }
   }
 
-  const certificatePath = await createCertififcate({
+  const data = await createCertificateBuffer({
     user,
-    totalAssignments: currentCertificate.totalAssignments,
-    scoresSum: currentCertificate.scoresSum,
-    averageAssigmentsScore: currentCertificate.averageAssigmentsScore,
+    averageAssigmentsScore: currentCertificate,
     activePlan: existingPlan,
     certificateId: currentCertificate._id,
   });
+
+  const result = await s3Uploadv4(data, "certificates", "invoice");
+  const certificatePath = result?.Key;
 
   let deletePreviousPromise = null;
   if (alreadyExists) {
@@ -541,6 +508,18 @@ exports.generateMyCertificate = async (req, res) => {
   const saveCurrentPromise = currentCertificate.save();
 
   await Promise.all([deletePreviousPromise, saveCurrentPromise]);
+};
+
+// By user
+exports.generateMyCertificate = async (req, res) => {
+  const { name, planId } = req.body;
+  const userId = req.user._id;
+
+  await createCertificate({
+    name,
+    planId,
+    userId,
+  });
 
   return res.status(StatusCodes.OK).json({
     success: true,
@@ -550,34 +529,18 @@ exports.generateMyCertificate = async (req, res) => {
 
 // TODO: By admin (Helper fun)
 exports.generateUserCertificates = async ({ plans, user }) => {
-  const progressPromises = [];
+  const createCertificatesPromises = [];
 
-  plans?.forEach((plan) => {
-    const promise = calculateProgress({
-      user,
-      activePlan: plan,
+  plans.forEach((plan) => {
+    createCertificate({
+      name: user.name,
+      planId: plan._id,
+      userId: user._id,
       isAdmin: true,
     });
-    progressPromises.push(promise);
   });
 
-  const progresses = await Promise.all(progressPromises);
-
-  console.log("Progress", progresses);
-  const createCertfificatePromises = [];
-  // progresses.forEach(async(progress)=>{
-  //   if (progress && averageAssigmentsScore) {
-  //     await CertificateModel.create({
-  //       user: user._id,
-  //       plan: activePlan,
-  //       averageAssigmentsScore,
-  //       totalAssignments: progress[0].totalAssignments,
-  //       scoresSum: progress[0].scoresSum,
-  //     });
-  //   }
-  // })
-
-  return progress;
+  await Promise.all(createCertificatesPromises);
 };
 
 exports.getCertificates = async (req, res) => {

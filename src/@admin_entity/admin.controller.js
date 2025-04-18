@@ -288,6 +288,12 @@ exports.getUsers = async (req, res) => {
         from: "certificates",
         foreignField: "user",
         localField: "_id",
+
+        pipeline: [
+          {
+            $match: { isIssued: true },
+          },
+        ],
         as: "certificates",
       },
     },
@@ -528,6 +534,7 @@ exports.updateUser = async (req, res) => {
   });
   const existingCertificatesPromise = CertificateModel.find({
     user: userId,
+    isIssued: true,
   });
 
   let planPromise = null;
@@ -664,7 +671,11 @@ exports.updateUser = async (req, res) => {
     }
 
     if (certificatePromises.length > 0) {
-      await Promise.all(certificatePromises);
+      try {
+        await Promise.all(certificatePromises);
+      } catch (error) {
+        throw new BadRequestError(error.message);
+      }
     }
   }
 

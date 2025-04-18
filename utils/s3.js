@@ -99,8 +99,6 @@ exports.s3Uploadv4 = async (file, folder, type = null) => {
     contentType = file.mimetype; // Use original content type
   }
 
-  console.log("Key", key);
-
   const params = {
     Bucket: process.env.AWS_BUCKET_NAME,
     Key: key,
