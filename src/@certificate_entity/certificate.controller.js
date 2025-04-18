@@ -3,6 +3,7 @@ const fs = require("fs");
 const mongoose = require("mongoose");
 const PDFDocument = require("pdfkit");
 const { StatusCodes } = require("http-status-codes");
+const QRCode = require("qrcode");
 
 const CertificateModel = require("./certificate.model");
 const OrderModel = require("../@order_entity/order.model");
@@ -67,6 +68,23 @@ exports.createCertfifcateTest = async (req, res) => {
     .opacity(1)
     .text("October 18, 2022");
 
+  const verifyUrl = `${process.env.FRONTEND_URL}/certificate/4324`;
+  // Generate the QR code as a data URL
+  const qrCodeDataURL = await QRCode.toDataURL(verifyUrl, {
+    errorCorrectionLevel: "H",
+    margin: 1,
+    // width: 00,
+    color: {
+      dark: "#000",
+      light: "#fff",
+    },
+  });
+
+  // Add the QR code to the PDF
+  doc.image(qrCodeDataURL, 90, 630, {
+    width: 90,
+  });
+
   // Finalize the PDF
   doc.end();
   doc.pipe(writeStream);
@@ -81,7 +99,20 @@ const createCertificateBuffer = async ({
   user,
   averageAssigmentsScore,
   activePlan,
+  certificateId,
 }) => {
+  const verifyUrl = `${process.env.FRONTEND_URL}/certificate/${certificateId}`;
+  // Generate the QR code as a data URL
+  const qrCodeDataURL = await QRCode.toDataURL(verifyUrl, {
+    errorCorrectionLevel: "H",
+    margin: 1,
+    // width: 00,
+    color: {
+      dark: "#000",
+      light: "#fff",
+    },
+  });
+
   return new Promise((resolve, reject) => {
     const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
 
@@ -106,7 +137,7 @@ const createCertificateBuffer = async ({
         lineGap: 8,
       })
       .opacity(1)
-      .text(`${user?.name || User} `, { continued: true })
+      .text(`${user?.name || "User"} `, { continued: true })
       .opacity(0.65)
       .text(`for successfully completing the `, {
         continued: true,
@@ -138,6 +169,11 @@ const createCertificateBuffer = async ({
       })
       .opacity(1)
       .text("October 18, 2022");
+
+    // Add the QR code to the PDF
+    doc.image(qrCodeDataURL, 90, 630, {
+      width: 90,
+    });
 
     writeStream.on("finish", () => {
       fs.readFile(tempFilePath, async (err, data) => {
@@ -187,11 +223,13 @@ const createCertififcate = async ({
   scoresSum,
   averageAssigmentsScore,
   activePlan,
+  certificateId,
 }) => {
   const data = await createCertificateBuffer({
     user,
     averageAssigmentsScore,
     activePlan,
+    certificateId,
   });
 
   const result = await s3Uploadv4(data, "certificates", "invoice");
@@ -465,8 +503,6 @@ exports.generateMyCertificate = async (req, res) => {
 
   const userPromise = userModel.findById(userId).select("email name");
 
-  // console.log("cuetrent pto", currentCertificatePromise);
-
   const existingPlanPromise = PlanModel.findById(planId);
 
   const [alreadyExists, currentCertificate, existingPlan, user] =
@@ -491,6 +527,7 @@ exports.generateMyCertificate = async (req, res) => {
     scoresSum: currentCertificate.scoresSum,
     averageAssigmentsScore: currentCertificate.averageAssigmentsScore,
     activePlan: existingPlan,
+    certificateId: currentCertificate._id,
   });
 
   let deletePreviousPromise = null;
@@ -547,6 +584,7 @@ exports.getCertificates = async (req, res) => {
   const userId = req.user._id;
   const certificates = await CertificateModel.find({
     user: userId,
+    isIssued: true,
   });
 
   return res.status(StatusCodes.OK).json({
@@ -554,6 +592,33 @@ exports.getCertificates = async (req, res) => {
     message: "Certificates fetched successfully",
     data: {
       certificates,
+    },
+  });
+};
+
+exports.verifyCertificate = async (req, res) => {
+  const id = req.params.id;
+
+  const existingCertificate = await CertificateModel.findOne({
+    _id: id,
+    isIssued: true,
+  })
+    .populate({
+      path: "user",
+      select: "name",
+    })
+    .lean();
+
+  if (!existingCertificate) {
+    throw new BadRequestError("This certificate is not valid");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Certificate is valid",
+    data: {
+      issuedOn: existingCertificate.updatedAt,
+      userName: existingCertificate.user.name,
     },
   });
 };
