@@ -101,6 +101,7 @@ const DashboardCarousalRouter = require("./src/@dashboard_carousal_entity/dashbo
 const DashboardContentRouter = require("./src/@dashboard_content_entity /dashboard_content.index.js");
 
 const CertificateRouter = require("./src/@certificate_entity/certificate.index.js");
+const AppConfigRouter = require("./src/@app_config_entity/app_config.index.js");
 
 // Paths
 
@@ -135,6 +136,7 @@ app.use("/api/v1/comment", CommentRouter);
 app.use("/api/v1/dashboard/carousal", DashboardCarousalRouter);
 app.use("/api/v1/dashboard/content", DashboardContentRouter);
 app.use("/api/v1/user-certificate", CertificateRouter);
+app.use("/api/v1/app-config", AppConfigRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);
