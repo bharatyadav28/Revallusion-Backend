@@ -621,7 +621,7 @@ exports.leaderBoard = async (req, res) => {
     },
     {
       $sort: {
-        averageAssigmentsScore: 1,
+        averageAssigmentsScore: -1,
       },
     },
     {
