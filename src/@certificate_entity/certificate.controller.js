@@ -14,7 +14,10 @@ const { BadRequestError, NotFoundError } = require("../../errors/index.js");
 const { s3Uploadv4 } = require("../../utils/s3.js");
 const sendEmail = require("../../utils/sendEmail");
 const userModel = require("../@user_entity/user.model.js");
-const { formatDateTime } = require("../../utils/helperFuns.js");
+const {
+  formatDateTime,
+  appendBucketName,
+} = require("../../utils/helperFuns.js");
 
 // Test
 exports.createCertfifcateTest = async (req, res) => {
@@ -30,44 +33,23 @@ exports.createCertfifcateTest = async (req, res) => {
 
   doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
 
-  doc.font("Times-Roman");
-
   doc
-    .fillColor("#000000") // Default color for most text
-    .opacity(0.65)
-    .fontSize(25)
-    .text("This certificate is proudly presented to ", 140, 290, {
-      continued: true,
-      lineGap: 8,
-    })
-    .opacity(1)
-    .text("Ravali Kandregula", { continued: true })
-    .opacity(0.65)
-    .text(" for successfully completing the ", { continued: true })
     .fillColor("#4486F4")
-    .opacity(1) // Default color for most text
-    .text("Advance Video Editing along with Motion Graphics ", {
-      continued: true,
-    })
-    .fillColor("#000000")
-    .opacity(0.65)
-    .text("offered by ", { continued: true })
-    .opacity(1)
-    .text("Ravallusion Academy.", { continued: true })
-    .opacity(0.7)
-    .text(
-      "We thank you for your exceptional efforts and wish you the best of luck in your future."
-    );
+    .font("Helvetica-Bold")
+    .fontSize(38)
+    .text("Abhinav Kabra", 400, 276);
 
   doc
-    .fillColor("#000000") // Default color for most text
-    .opacity(0.65)
-    .fontSize(18)
-    .text("Issued on: ", 400, 470, {
-      continued: true,
-    })
-    .opacity(1)
-    .text("October 18, 2022");
+    .fillColor("#002C75")
+    .font("Helvetica")
+    .fontSize(30)
+    .text("Advance Video Editing along with Motion Graphics", 200, 362.5);
+
+  doc
+    .fillColor("#4486F4")
+    .font("Helvetica")
+    .fontSize(17)
+    .text("October 18, 2022", 502, 492);
 
   const verifyUrl = `${process.env.FRONTEND_URL}/certificate/4324`;
   // Generate the QR code as a data URL
@@ -152,6 +134,7 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
         course: {
           $in: coveredCourseIds,
         },
+        isDeleted: false,
       },
     },
     {
@@ -303,13 +286,25 @@ exports.saveUserProgress = async (userId) => {
     });
 
     if (progress && averageAssigmentsScore) {
-      await CertificateModel.create({
+      const existingProgress = await CertificateModel.findOne({
         user: userId,
         plan: activePlan,
-        averageAssigmentsScore,
-        totalAssignments: progress[0].totalAssignments,
-        scoresSum: progress[0].scoresSum,
       });
+      if (existingProgress) {
+        existingProgress.averageAssigmentsScore = averageAssigmentsScore;
+        existingProgress.totalAssignments = progress[0].totalAssignments;
+        existingProgress.scoresSum = progress[0].scoresSum;
+
+        await existingProgress.save();
+      } else {
+        await CertificateModel.create({
+          user: userId,
+          plan: activePlan,
+          averageAssigmentsScore,
+          totalAssignments: progress[0].totalAssignments,
+          scoresSum: progress[0].scoresSum,
+        });
+      }
     }
   }
 };
@@ -345,53 +340,31 @@ const createCertificateBuffer = async ({
 
     doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
 
-    doc.font("Times-Roman");
+    doc
+      .fillColor("#4486F4")
+      .font("Helvetica-Bold")
+      .fontSize(38)
+      .text(user?.name || "User", 400, 276);
 
     doc
-      .fillColor("#000000")
-      .opacity(0.65)
-      .fontSize(25)
-      .text("This certificate is proudly presented to ", 140, 290, {
-        continued: true,
-        lineGap: 8,
-      })
-      .opacity(1)
-      .text(`${user?.name || "User"} `, { continued: true })
-      .opacity(0.65)
-      .text(`for successfully completing the `, {
-        continued: true,
-      })
-      .fillColor("#4486F4")
-      .opacity(1)
+      .fillColor("#002C75")
+      .font("Helvetica")
+      .fontSize(30)
       .text(
-        `${activePlan.plan_type} Video Editing along with Motion Graphics `,
-        {
-          continued: true,
-        }
-      )
-      .fillColor("#000000")
-      .opacity(0.65)
-      .text("offered by ", { continued: true })
-      .opacity(1)
-      .text("Ravallusion Academy. ", { continued: true })
-      .opacity(0.7)
-      .text(
-        "We thank you for your exceptional efforts and wish you the best of luck in your future."
+        `${activePlan.plan_type} Video Editing along with Motion Graphics`,
+        200,
+        362.5
       );
 
     doc
-      .fillColor("#000000")
-      .opacity(0.65)
-      .fontSize(18)
-      .text("Issued on: ", 400, 470, {
-        continued: true,
-      })
-      .opacity(1)
-      .text(formatDateTime(new Date()));
+      .fillColor("#4486F4")
+      .font("Helvetica")
+      .fontSize(17)
+      .text(formatDateTime(new Date()), 502, 492);
 
     // Add the QR code to the PDF
-    doc.image(qrCodeDataURL, 90, 630, {
-      width: 90,
+    doc.image(qrCodeDataURL, 90, 658, {
+      width: 70,
     });
 
     writeStream.on("finish", () => {
@@ -435,7 +408,7 @@ const createCertificateBuffer = async ({
 };
 
 const createCertificate = async ({ name, planId, userId, isAdmin }) => {
-  if (!name) throw new BadRequestError("Please provide name");
+  if (!isAdmin && !name) throw new BadRequestError("Please provide name");
   if (!planId) throw new BadRequestError("Please enter plan id");
 
   const alreadyExistsPromise = CertificateModel.findOne({
@@ -466,17 +439,28 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
     throw new BadRequestError("Certificate already issued");
   }
 
+  let progressResult = null;
+  if (isAdmin && currentCertificate) {
+    // Update the latest progress
+    progressResult = await calculateProgress({
+      user,
+      activePlan: existingPlan,
+      isAdmin: true,
+    });
+
+    const { progress, averageAssigmentsScore } = progressResult;
+
+    currentCertificate.averageAssigmentsScore = averageAssigmentsScore;
+    currentCertificate.totalAssignments = progress[0].totalAssignments;
+    currentCertificate.scoresSum = progress[0].scoresSum;
+  }
+
   if (!currentCertificate) {
     if (!isAdmin) {
       throw new BadRequestError("Please complete the course first");
     } else {
-      const progressResult = await calculateProgress({
-        user,
-        activePlan: existingPlan,
-        isAdmin: true,
-      });
-
       const { progress, averageAssigmentsScore } = progressResult;
+
       currentCertificate = await CertificateModel.create({
         user: userId,
         plan: existingPlan._id,
@@ -532,12 +516,14 @@ exports.generateUserCertificates = async ({ plans, user }) => {
   const createCertificatesPromises = [];
 
   plans.forEach((plan) => {
-    createCertificate({
+    const createPromise = createCertificate({
       name: user.name,
       planId: plan._id,
       userId: user._id,
       isAdmin: true,
     });
+
+    createCertificatesPromises.push(createPromise);
   });
 
   await Promise.all(createCertificatesPromises);
@@ -580,8 +566,7 @@ exports.verifyCertificate = async (req, res) => {
     success: true,
     message: "Certificate is valid",
     data: {
-      issuedOn: existingCertificate.updatedAt,
-      userName: existingCertificate.user.name,
+      certificate: appendBucketName(existingCertificate.path),
     },
   });
 };
@@ -599,7 +584,7 @@ exports.leaderBoard = async (req, res) => {
     ];
   }
 
-  const query2 = { isIssued: true };
+  const query2 = {};
   if (from || to) {
     query2.createdAt = {};
     if (from) query2.createdAt.$gte = new Date(from);

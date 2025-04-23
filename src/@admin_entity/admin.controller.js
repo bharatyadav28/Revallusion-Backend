@@ -663,10 +663,18 @@ exports.updateUser = async (req, res) => {
       const planIds = toDeleteCertificates?.map((certificate) =>
         certificate.plan.toString()
       );
-      const deletePromise = CertificateModel.deleteMany({
-        user: userId,
-        plan: { $in: planIds },
-      });
+      const deletePromise = CertificateModel.updateMany(
+        {
+          user: userId,
+          plan: { $in: planIds },
+        },
+        {
+          $set: {
+            isIssued: false,
+            path: "",
+          },
+        }
+      );
       certificatePromises.push(deletePromise);
     }
 
