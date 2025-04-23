@@ -33,11 +33,16 @@ exports.createCertfifcateTest = async (req, res) => {
 
   doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
 
+  const name = "Abhinav";
+  const splitName = name.split(" ");
+
+  let xIndex = splitName.length === 1 ? 450 : 400;
+
   doc
     .fillColor("#4486F4")
     .font("Helvetica-Bold")
     .fontSize(38)
-    .text("Abhinav Kabra", 400, 276);
+    .text(name, xIndex, 276);
 
   doc
     .fillColor("#002C75")
@@ -340,11 +345,15 @@ const createCertificateBuffer = async ({
 
     doc.image(imagePath, 0, 0, { width: 1056, height: 816 });
 
+    const name = user?.name || "User";
+    const splitName = name.split(" ");
+    const xIndex = splitName.length === 1 ? 450 : 400;
+
     doc
       .fillColor("#4486F4")
       .font("Helvetica-Bold")
       .fontSize(38)
-      .text(user?.name || "User", 400, 276);
+      .text(name, xIndex, 276);
 
     doc
       .fillColor("#002C75")
@@ -439,10 +448,12 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
     throw new BadRequestError("Certificate already issued");
   }
 
-  let progressResult = null;
-  if (isAdmin && currentCertificate) {
-    // Update the latest progress
-    progressResult = await calculateProgress({
+  if (!isAdmin && !currentCertificate) {
+    throw new BadRequestError("Please complete the course first");
+  }
+
+  if (isAdmin) {
+    const progressResult = await calculateProgress({
       user,
       activePlan: existingPlan,
       isAdmin: true,
@@ -450,23 +461,17 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
 
     const { progress, averageAssigmentsScore } = progressResult;
 
-    currentCertificate.averageAssigmentsScore = averageAssigmentsScore;
-    currentCertificate.totalAssignments = progress[0].totalAssignments;
-    currentCertificate.scoresSum = progress[0].scoresSum;
-  }
-
-  if (!currentCertificate) {
-    if (!isAdmin) {
-      throw new BadRequestError("Please complete the course first");
+    if (currentCertificate) {
+      currentCertificate.averageAssigmentsScore = averageAssigmentsScore;
+      currentCertificate.totalAssignments = progress[0]?.totalAssignments;
+      currentCertificate.scoresSum = progress[0]?.scoresSum || 0;
     } else {
-      const { progress, averageAssigmentsScore } = progressResult;
-
       currentCertificate = await CertificateModel.create({
         user: userId,
         plan: existingPlan._id,
         averageAssigmentsScore,
-        totalAssignments: progress[0].totalAssignments,
-        scoresSum: progress[0].scoresSum,
+        totalAssignments: progress[0]?.totalAssignments,
+        scoresSum: progress[0]?.scoresSum,
       });
     }
   }
