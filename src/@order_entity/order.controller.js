@@ -327,6 +327,7 @@ exports.createCashFreeOrder = async (req, res) => {
     status: "Pending",
     actual_price: existingPlan.inr_price,
     hasUpgraded,
+    order_meta: { payment_methods: "upi,cc,dc,nb,app,banktransfer" },
   };
 
   const savedOrder = await OrderModel.create(query);
