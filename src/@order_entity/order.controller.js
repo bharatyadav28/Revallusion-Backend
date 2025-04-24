@@ -263,7 +263,7 @@ exports.verifyRazorpayPayment = async (req, res) => {
   });
 
   const frontendDomain = getFrontendDomain(req);
-  return res.redirect(`${frontendDomain}/verify-payment`);
+  return res.redirect(`${frontendDomain}/rajorpay-payment-success`);
 
   // return res.status(StatusCodes.OK).json({
   //   success: true,
@@ -294,7 +294,8 @@ exports.createCashFreeOrder = async (req, res) => {
     },
 
     order_meta: {
-      return_url: `${frontendDomain}/verify-payment?order_id=${order_id}`,
+      return_url: `${frontendDomain}/verify-payment-cashfree?order_id=${order_id}`,
+      payment_methods: "upi,cc,dc,nb,app,banktransfer",
 
       // return_url: `https://ravallusion-repo-mine.vercel.app/verify-payment?order_id=${order_id}`,
     },
@@ -327,7 +328,6 @@ exports.createCashFreeOrder = async (req, res) => {
     status: "Pending",
     actual_price: existingPlan.inr_price,
     hasUpgraded,
-    order_meta: { payment_methods: "upi,cc,dc,nb,app,banktransfer" },
   };
 
   const savedOrder = await OrderModel.create(query);
