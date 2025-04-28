@@ -7,6 +7,7 @@ const cookieParser = require("cookie-parser");
 const path = require("path");
 const Razorpay = require("razorpay");
 const { Cashfree } = require("cashfree-pg");
+const chalk = require("chalk");
 
 require("express-async-errors");
 require("./utils/cronJobs.js");
@@ -56,16 +57,14 @@ const istLogger = morgan((tokens, req, res) => {
   });
 
   return [
-    `[${istTime}]`,
-    tokens.method(req, res),
-    tokens.url(req, res),
-    tokens.status(req, res),
-    "-",
-    tokens["response-time"](req, res),
-    "ms",
+    chalk.blue(`[${istTime}]`),
+    chalk.green(tokens.method(req, res)),
+    chalk.magenta(tokens.url(req, res)),
+    chalk.yellow(tokens.status(req, res)),
+    chalk.white("-"),
+    chalk.red(`${tokens["response-time"](req, res)} ms`),
   ].join(" ");
 });
-
 app.use(istLogger);
 
 app.get("/", (req, res, next) =>
