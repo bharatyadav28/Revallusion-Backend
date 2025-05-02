@@ -1,4 +1,5 @@
 const StatusCodes = require("http-status-codes");
+const axios = require("axios");
 
 const { instance } = require("../../app");
 const crypto = require("crypto");
@@ -378,6 +379,135 @@ exports.verifyCashFreePayment = async (req, res) => {
     success: true,
     message: "Payment verified successfully",
   });
+};
+
+const getPaypalAccessToken = async (req, res) => {
+  const auth = Buffer.from(
+    process.env.PAYPAL_CLIENT_ID + ":" + process.env.PAYPAL_CLIENT_SECRET
+  ).toString("base64");
+
+  const response = await fetch(
+    `${process.env.PAYPAL_BASE_URL}/v1/oauth2/token`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Authorization: `Basic ${auth}`,
+      },
+      body: "grant_type=client_credentials",
+    }
+  );
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Failed to get access token: ${error}`);
+  }
+
+  const data = await response.json();
+  console.log("Data:", data);
+  return data.access_token;
+};
+
+exports.createPaypalOrder = async (req, res) => {
+  const { plan } = req.body;
+  const userId = req?.user?._id;
+
+  const { existingPlan, amount, expiry_date, hasUpgraded, user } =
+    await getOrderDetails({ plan, userId });
+
+  const accessToken = await getPaypalAccessToken();
+  console.log("Access token: ", accessToken);
+
+  const response = await fetch(
+    `${process.env.PAYPAL_BASE_URL}/v2/checkout/orders`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        intent: "CAPTURE",
+        purchase_units: [
+          {
+            amount: {
+              currency_code: "USD",
+              value: 1,
+            },
+          },
+        ],
+      }),
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new BadRequestError(data?.message);
+  }
+  // Save order to database
+  const query = {
+    user: userId,
+    order_id: data.id,
+    plan: existingPlan._id,
+    inr_price: amount,
+    expiry_date,
+    status: "Pending",
+    actual_price: existingPlan.inr_price,
+    hasUpgraded,
+  };
+
+  const savedOrder = await OrderModel.create(query);
+  if (!savedOrder) throw new BadRequestError("Order not created");
+
+  res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Order created successfully",
+    data: { order: savedOrder },
+  });
+};
+
+exports.verifyPaypalOrder = async (req, res) => {
+  const accessToken = await getPaypalAccessToken();
+  const { id: orderID } = req.params;
+  console.log(typeof fetch);
+
+  const response = await fetch(
+    `${process.env.PAYPAL_BASE_URL}/v2/checkout/orders/${orderID}/capture`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  const data = await response.json();
+
+  console.log("captured Data: ", data);
+  if (!response.ok) {
+    throw new BadRequestError(data?.message);
+  }
+
+  const isAuthentic = data.status === "COMPLETED";
+
+  await activateSubscription({
+    order_id: orderID,
+    gateway: "Paypal",
+    payment_id: data?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
+    isAuthentic,
+    userId: req.user._id,
+    razorpay_signature,
+  });
+
+  const frontendDomain = getFrontendDomain(req);
+  return res.redirect(`${frontendDomain}/rajorpay-payment-success`);
+
+  // return res.status(StatusCodes.OK).json({
+  //   success: true,
+  //   message: "Payment verified successfully",
+  //   data: { response },
+  // });
 };
 
 // Check if user has subscription

@@ -14,6 +14,7 @@
     "@aws-sdk/lib-storage": "^3.705.0",
     "@sendgrid/mail": "^8.1.5",
     "aws-sdk": "^2.1692.0",
+    "axios": "^1.9.0",
     "bcrypt": "^5.1.1",
     "cashfree-pg": "^5.0.3",
     "chalk": "^4.1.2",

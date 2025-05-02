@@ -6,7 +6,6 @@ const pageNotFound = require("./middlewares/pageNotFound");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 const Razorpay = require("razorpay");
-const { Cashfree } = require("cashfree-pg");
 const chalk = require("chalk");
 
 require("express-async-errors");
@@ -20,13 +19,6 @@ exports.instance = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
-
-// CashFree
-// exports.cashfree = new Cashfree(
-//   "SANDBOX",
-//   process.env.CASHFREE_KEY_ID,
-//   process.env.CASHFREE_KEY_SECRET
-// );
 
 // Predefined middlewares
 app.use(express.json());
@@ -87,6 +79,7 @@ const userRouter = require("./src/@user_entity/user.index");
 const adminRouter = require("./src/@admin_entity/admin.index");
 const videoRouter = require("./src/@video_entity/video.index");
 const videoProgressRouter = require("./src/@video_progress_entity/video_progress.index");
+const timestampRouter = require("./src/@timestamp_entity/timestamp.index");
 const courseRouter = require("./src/@course_entity/course.index");
 const courseModuleRouter = require("./src/@course_module_entity/course_module.index");
 const submoduleRouter = require("./src/@submodule_entity/submodule.index");
@@ -121,6 +114,7 @@ app.use("/api/v1/user", userRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/video", videoRouter);
 app.use("/api/v1/video-progress", videoProgressRouter);
+app.use("/api/v1/timestamp", timestampRouter);
 app.use("/api/v1/course/module", courseModuleRouter);
 app.use("/api/v1/course/submodule", submoduleRouter);
 app.use("/api/v1/course", courseRouter);

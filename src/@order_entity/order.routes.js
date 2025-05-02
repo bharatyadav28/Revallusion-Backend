@@ -9,6 +9,8 @@ const {
   mySubscription,
   createCashFreeOrder,
   verifyCashFreePayment,
+  createPaypalOrder,
+  verifyPaypalOrder,
 } = require("./order.controller");
 
 const router = express.Router();
@@ -21,6 +23,10 @@ router.route("/razor-pay/verify").post(auth, verifyRazorpayPayment);
 // Cash-free
 router.route("/cash-free").post(auth, createCashFreeOrder);
 router.route("/cash-free/verify").get(auth, verifyCashFreePayment);
+
+// Paypal
+router.route("/paypal").post(auth, createPaypalOrder);
+router.route("/paypal/:id").post(auth, verifyPaypalOrder);
 
 router.route("/has-subscription/:userId").get(hasSubscription);
 
