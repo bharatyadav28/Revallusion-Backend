@@ -6,8 +6,13 @@ const { NotFoundError } = require("../../errors/index.js");
 
 // Add a plan
 exports.addPlan = async (req, res) => {
-  const { plan_type, inr_price, validity } = req.body;
-  const plan = await PlanModel.create({ plan_type, inr_price, validity });
+  const { plan_type, inr_price, usd_price, validity } = req.body;
+  const plan = await PlanModel.create({
+    plan_type,
+    inr_price,
+    usd_price,
+    validity,
+  });
 
   if (!plan) {
     throw new BadRequestError("Plan not created");
@@ -56,11 +61,12 @@ exports.getPlan = async (req, res, next) => {
 // Update a plan
 exports.updatePlan = async (req, res, next) => {
   const plan = await PlanModel.findById(req.params.id);
-  const { inr_price } = req.body;
+  const { inr_price, usd_price } = req.body;
   if (!plan) {
     throw new NotFoundError("Plan not found");
   }
   if (inr_price) plan.inr_price = inr_price;
+  if (usd_price) plan.usd_price = usd_price;
 
   await plan.save();
 

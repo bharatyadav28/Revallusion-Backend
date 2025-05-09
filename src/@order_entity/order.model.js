@@ -19,6 +19,9 @@ const schema = new mongoose.Schema(
     inr_price: {
       type: Number,
     },
+    usd_price: {
+      type: Number,
+    },
     expiry_date: {
       type: Date,
     },

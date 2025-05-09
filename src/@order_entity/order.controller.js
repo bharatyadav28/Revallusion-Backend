@@ -24,7 +24,7 @@ const { s3Uploadv4 } = require("../../utils/s3");
 // const { cashfree } = require("../../app");
 
 // Helper functions
-const getOrderDetails = async ({ plan, userId }) => {
+const getOrderDetails = async ({ plan, userId, isPaypalOrder }) => {
   const user = await UserModel.findById(userId);
   if (!user)
     throw new NotFoundError("Account not found, please create a new account");
@@ -46,7 +46,7 @@ const getOrderDetails = async ({ plan, userId }) => {
     status: "Active",
   }).populate({
     path: "plan",
-    select: "plan_type validity inr_price level",
+    select: "plan_type validity inr_price usd_price level",
   });
 
   if (activeOrder) {
@@ -75,7 +75,9 @@ const getOrderDetails = async ({ plan, userId }) => {
         );
       }
 
-      remainingAmount = activeOrder.plan.inr_price;
+      remainingAmount = isPaypalOrder
+        ? activeOrder.plan.usd_price
+        : activeOrder.plan.inr_price;
     }
   }
 
@@ -85,13 +87,17 @@ const getOrderDetails = async ({ plan, userId }) => {
   const validityInDays = existingPlan.validity / (60 * 60 * 24);
   expiry_date.setDate(expiry_date.getDate() + validityInDays);
 
+  const actual_price = isPaypalOrder
+    ? existingPlan.usd_price
+    : existingPlan.inr_price;
   // Amount in Rupees
-  const amount = Math.floor(existingPlan.inr_price - remainingAmount);
+  const amount = Math.floor(actual_price - remainingAmount);
 
   const orderDetails = {
     existingPlan: {
       _id: existingPlan._id,
       inr_price: existingPlan.inr_price,
+      usd_price: existingPlan.usd_price,
     },
     amount,
     expiry_date,
@@ -110,6 +116,7 @@ const activateSubscription = async ({
   userId,
   razorpay_signature,
 }) => {
+  const isPaypalGateway = gateway === "Paypal";
   const order = await OrderModel.findOne({
     order_id,
   }).populate({ path: "plan", select: "plan_type" });
@@ -121,7 +128,7 @@ const activateSubscription = async ({
     order: order._id,
     user: order.user,
     payment_id,
-    amount: order.inr_price,
+    amount: isPaypalGateway ? order.usd_price : order.inr_price,
     gateway,
     status: "Pending",
   });
@@ -404,7 +411,6 @@ const getPaypalAccessToken = async (req, res) => {
   }
 
   const data = await response.json();
-  console.log("Data:", data);
   return data.access_token;
 };
 
@@ -416,7 +422,6 @@ exports.createPaypalOrder = async (req, res) => {
     await getOrderDetails({ plan, userId });
 
   const accessToken = await getPaypalAccessToken();
-  console.log("Access token: ", accessToken);
 
   const response = await fetch(
     `${process.env.PAYPAL_BASE_URL}/v2/checkout/orders`,
@@ -432,7 +437,7 @@ exports.createPaypalOrder = async (req, res) => {
           {
             amount: {
               currency_code: "USD",
-              value: 1,
+              value: Number(amount).toFixed(2),
             },
           },
         ],
@@ -450,10 +455,10 @@ exports.createPaypalOrder = async (req, res) => {
     user: userId,
     order_id: data.id,
     plan: existingPlan._id,
-    inr_price: amount,
+    usd_price: Number(amount).toFixed(2),
     expiry_date,
     status: "Pending",
-    actual_price: existingPlan.inr_price,
+    actual_price: existingPlan.usd_price,
     hasUpgraded,
   };
 
@@ -470,7 +475,8 @@ exports.createPaypalOrder = async (req, res) => {
 exports.verifyPaypalOrder = async (req, res) => {
   const accessToken = await getPaypalAccessToken();
   const { id: orderID } = req.params;
-  console.log(typeof fetch);
+
+  console.log("Verify paypal");
 
   const response = await fetch(
     `${process.env.PAYPAL_BASE_URL}/v2/checkout/orders/${orderID}/capture`,
@@ -478,15 +484,15 @@ exports.verifyPaypalOrder = async (req, res) => {
       method: "POST",
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
       },
     }
   );
 
   const data = await response.json();
 
-  console.log("captured Data: ", data);
   if (!response.ok) {
-    throw new BadRequestError(data?.message);
+    throw new BadRequestError("Payment failed");
   }
 
   const isAuthentic = data.status === "COMPLETED";
@@ -497,17 +503,17 @@ exports.verifyPaypalOrder = async (req, res) => {
     payment_id: data?.purchase_units?.[0]?.payments?.captures?.[0]?.id,
     isAuthentic,
     userId: req.user._id,
-    razorpay_signature,
   });
 
-  const frontendDomain = getFrontendDomain(req);
-  return res.redirect(`${frontendDomain}/rajorpay-payment-success`);
+  console.log("Verified!!!");
 
-  // return res.status(StatusCodes.OK).json({
-  //   success: true,
-  //   message: "Payment verified successfully",
-  //   data: { response },
-  // });
+  const frontendDomain = getFrontendDomain(req);
+  // return res.redirect(`${frontendDomain}/rajorpay-payment-success`);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Payment verified successfully",
+  });
 };
 
 // Check if user has subscription

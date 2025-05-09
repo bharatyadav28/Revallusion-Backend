@@ -9,7 +9,12 @@ const PlanSchema = new mongoose.Schema(
     },
     inr_price: {
       type: String,
-      required: [true, "Please provide plan price"],
+      required: [true, "Please provide inr plan price"],
+      trim: true,
+    },
+    usd_price: {
+      type: String,
+      required: [true, "Please provide usd plan price"],
       trim: true,
     },
     validity: {
