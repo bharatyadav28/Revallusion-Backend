@@ -7,54 +7,85 @@ const { default: mongoose } = require("mongoose");
 
 // Create carousal
 exports.createDashboardCarousal = async (req, res) => {
-  const { imageUrl } = req.body;
+  const { videos: newVideos } = req.body;
 
-  const imagePath = extractURLKey(imageUrl);
-  const nextSequence = Number(await DashboardCarousalModel.getNextSequence());
-
-  const newDashboardCarousal = await DashboardCarousalModel.create({
-    sequence: nextSequence,
-    image: imagePath,
-  });
-
-  if (!newDashboardCarousal) {
-    throw new BadRequestError("Dashboard Carousal not created");
+  if (newVideos.length === 0) {
+    throw new BadRequestError("Please enter videos");
   }
 
-  res.status(201).json({
+  const nextSequence =
+    Number(await DashboardCarousalModel.getNextSequence()) - 1;
+
+  const newCarousals = newVideos.map((video, index) => ({
+    sequence: nextSequence + index + 1,
+    video: video.videoId,
+  }));
+
+  await DashboardCarousalModel.insertMany(newCarousals);
+
+  res.status(StatusCodes.OK).json({
     success: true,
-    message: "Image added successfully",
+    message: "Carousal added successfully",
   });
 };
 
 // Get all carousals
 exports.getDashboardCarousals = async (req, res) => {
-  const carousal = await DashboardCarousalModel.aggregate([
+  const carousals = await DashboardCarousalModel.aggregate([
+    { $sort: { sequence: 1 } },
     {
-      $sort: { sequence: 1 },
-    },
-    {
-      $addFields: {
-        image: {
-          $concat: [awsUrl, "/", "$image"],
-        },
+      $lookup: {
+        from: "videos",
+        localField: "video",
+        foreignField: "_id",
+        as: "video",
+        pipeline: [
+          {
+            $match: {
+              isDeleted: false,
+            },
+          },
+          {
+            $addFields: {
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              thumbnailUrl: 1,
+            },
+          },
+        ],
       },
+    },
+
+    {
+      // Stage 3: Filter out documents where video array is empty
+      $match: {
+        video: { $ne: [] },
+      },
+    },
+
+    {
+      $unwind: "$video",
     },
     {
       $project: {
-        image: 1,
+        video: 1,
         sequence: 1,
-        createdAt: 1,
       },
     },
   ]);
 
-  res.status(201).json({
+  res.status(StatusCodes.OK).json({
     success: true,
-    message: "Dashboard fetched successfully",
-    data: {
-      carousal,
-    },
+    message: "Carousals fetched successfully",
+    data: { carousals },
   });
 };
 
@@ -64,7 +95,7 @@ exports.updateDashboardCarousal = async (req, res) => {
 
   const carousal = await DashboardCarousalModel.findById(id);
   if (!carousal) {
-    throw new NotFoundError("Dashboard Carousal not found");
+    throw new NotFoundError("Carousal not found");
   }
 
   if (sequence !== carousal.sequence) {
@@ -85,8 +116,15 @@ exports.updateDashboardCarousal = async (req, res) => {
       await session.withTransaction(async () => {
         const oldSequence = carousal.sequence;
 
+        // 1. Temporarily mark the moving submodule
+        await DashboardCarousalModel.updateOne(
+          { _id: carousal._id },
+          { $set: { sequence: -1 } }, // Temporary marker
+          { session }
+        );
+
         if (sequence > oldSequence) {
-          // 1. Moving down: decrease sequence of items in between
+          // 2. Moving down: decrease sequence of items in between
           await DashboardCarousalModel.updateMany(
             {
               sequence: { $gt: oldSequence, $lte: sequence },
@@ -95,7 +133,7 @@ exports.updateDashboardCarousal = async (req, res) => {
             { session }
           );
         } else if (sequence < oldSequence) {
-          //2.  Moving up: increase sequence of items in between
+          //3.  Moving up: increase sequence of items in between
           const r = await DashboardCarousalModel.updateMany(
             {
               sequence: { $gte: sequence, $lt: oldSequence },
@@ -117,9 +155,9 @@ exports.updateDashboardCarousal = async (req, res) => {
     }
   }
 
-  return res.status(StatusCodes.OK).json({
+  res.status(StatusCodes.OK).json({
     success: true,
-    message: "Dashboard Carousal updated successfully",
+    message: "Carousal sequence updated successfully",
   });
 };
 
@@ -128,10 +166,11 @@ exports.deleteDashboardCarousal = async (req, res) => {
   const { id } = req.params;
 
   const carousal = await DashboardCarousalModel.findById(id);
-
   if (!carousal) {
-    throw new NotFoundError("Dashboard Carousal not found");
+    throw new NotFoundError("Carousal not found");
   }
+
+  const sequence = carousal.sequence;
 
   const session = await mongoose.startSession();
 
@@ -149,7 +188,7 @@ exports.deleteDashboardCarousal = async (req, res) => {
       }
 
       await DashboardCarousalModel.updateMany(
-        { sequence: { $gt: carousal.sequence } },
+        { sequence: { $gt: sequence } },
         { $inc: { sequence: -1 } },
         { session }
       );
@@ -161,6 +200,6 @@ exports.deleteDashboardCarousal = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: " Image removed successfully",
+    message: "Carousal removed successfully",
   });
 };

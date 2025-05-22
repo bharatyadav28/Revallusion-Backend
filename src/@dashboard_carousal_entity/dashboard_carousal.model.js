@@ -2,19 +2,18 @@ const mongoose = require("mongoose");
 
 const DashboardCarousalSchema = new mongoose.Schema(
   {
-    image: {
-      type: String,
-      trim: true,
-      required: [true, "Please provide image url"],
+    video: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Video",
+      required: [true, "Please provide video id"],
     },
     sequence: {
       type: Number,
-      required: [true, "Please enter image sequence"],
+      required: [true, "Please enter video sequence"],
     },
   },
   { timestamps: true }
 );
-
 DashboardCarousalSchema.index({ sequence: 1 });
 
 // Get next sequence number in the list

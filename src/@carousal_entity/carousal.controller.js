@@ -200,6 +200,6 @@ exports.deleteCarousal = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Carosual removed successfully",
+    message: "Carousal removed successfully",
   });
 };
