@@ -11,6 +11,8 @@ const {
   awsUrl,
 } = require("../../utils/helperFuns");
 const sendEmail = require("../../utils/sendEmail");
+const { default: mongoose } = require("mongoose");
+const { StatusCodes } = require("http-status-codes");
 
 exports.getAllTransactions = async (req, res) => {
   let { search, paymentId, from, to, currentPage } = req.query;
@@ -386,5 +388,93 @@ exports.getFilteredTransactions = async (req, res, next) => {
     success: true,
     message: "Transactions fetched successfully",
     data: { transactions },
+  });
+};
+
+exports.getUserTransactions = async (req, res) => {
+  const userId = req.params.id;
+  const { currentPage } = req.query;
+
+  const page = currentPage || 1;
+  const limit = 4;
+  const skip = (page - 1) * limit;
+
+  const transactionsPromise = TransactionModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $lookup: {
+        from: "orders",
+        let: {
+          orderId: "$order",
+        },
+
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$_id", "$$orderId"],
+              },
+            },
+          },
+
+          {
+            $project: {
+              _id: 0,
+              plan: 1,
+            },
+          },
+        ],
+        as: "order",
+      },
+    },
+    {
+      $set: {
+        plan: {
+          $arrayElemAt: ["$order.plan", 0],
+        },
+
+        invoice_url: { $concat: [awsUrl, "/", "$invoice_url"] },
+      },
+    },
+    {
+      $project: {
+        payment_id: 1,
+        gateway: 1,
+        amount: 1,
+        status: 1,
+        invoice_url: 1,
+        plan: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  const totalUserTransactionsPromise = TransactionModel.countDocuments({
+    user: userId,
+  });
+
+  const [transactions, totalUserTransactions] = await Promise.all([
+    transactionsPromise,
+    totalUserTransactionsPromise,
+  ]);
+  const pagesCount = Math.ceil(totalUserTransactions / limit);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "User transactions fetched successfully",
+    data: {
+      transactions,
+      pagesCount,
+    },
   });
 };
