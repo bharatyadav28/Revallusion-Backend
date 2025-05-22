@@ -12,6 +12,7 @@ const {
   updateMobile,
   updateName,
   deleteAccount,
+  updateAddress,
 } = require("./user.controller");
 const { upload } = require("../../utils/s3");
 
@@ -29,6 +30,7 @@ router.route("/logout").delete(auth, logout);
 router.route("/avatar").put(auth, upload.single("file"), updateAvatar);
 router.route("/name").put(auth, updateName);
 router.route("/mobile").put(auth, updateMobile);
+router.route("/address").put(auth, updateAddress);
 
 router.route("/delete-account").delete(auth, deleteAccount);
 

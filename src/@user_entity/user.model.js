@@ -89,6 +89,11 @@ const userSchema = new mongoose.Schema(
       default: "user",
     },
 
+    address: {
+      type: String,
+      trim: true,
+    },
+
     activeSessions: [activeSessionSchema],
 
     isDeleted: {

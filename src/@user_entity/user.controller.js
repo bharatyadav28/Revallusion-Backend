@@ -36,7 +36,7 @@ exports.sendMe = async (req, res) => {
 
   const userPromise = userModel
     .findOne({ _id: userId, isDeleted: false })
-    .select("_id name email mobile role isEmailVerified avatar")
+    .select("_id name email mobile role isEmailVerified avatar address")
     .lean();
 
   const orderPromise = OrderModel.exists({
@@ -460,6 +460,38 @@ exports.updateMobile = async (req, res) => {
     message: "Phone number updated successfully",
     data: {
       mobile: user.mobile,
+    },
+  });
+};
+
+exports.updateAddress = async (req, res) => {
+  const userId = req.user._id;
+  const { address } = req.body;
+
+  if (!address) {
+    throw new BadRequestError("Please enter address");
+  }
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      address,
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!user) {
+    throw new BadRequestError("Address updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Address updated successfully",
+    data: {
+      address: user.address,
     },
   });
 };
