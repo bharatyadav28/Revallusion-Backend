@@ -28,6 +28,9 @@ const CertificateSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please enter average assigment score"],
     },
+    completionTime: {
+      type: Number,
+    },
     isIssued: {
       type: Boolean,
       default: false,

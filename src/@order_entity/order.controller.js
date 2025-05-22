@@ -419,7 +419,7 @@ exports.createPaypalOrder = async (req, res) => {
   const userId = req?.user?._id;
 
   const { existingPlan, amount, expiry_date, hasUpgraded, user } =
-    await getOrderDetails({ plan, userId });
+    await getOrderDetails({ plan, userId, isPaypalOrder: true });
 
   const accessToken = await getPaypalAccessToken();
 

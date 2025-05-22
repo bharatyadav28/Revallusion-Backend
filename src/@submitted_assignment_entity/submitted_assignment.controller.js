@@ -20,6 +20,7 @@ const {
   generateAutoCertificate,
   saveUserProgress,
 } = require("../@certificate_entity/certificate.controller");
+const SubmoduleModel = require("../@submodule_entity/submodule.model");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
   // Upload image or document file only
@@ -123,27 +124,25 @@ exports.updateScore = async (req, res) => {
   });
 };
 
-// Get submitted assignments by course
+// Get all submitted assignments
 exports.getSubmittedAssignments = async (req, res) => {
-  const { id: courseId } = req.params;
-
   // Filter params
   const { moduleId, submoduleId, isGraded, resultPerPage, currentPage } =
     req.query;
 
   // Filter assignments based on course, module and submodule
   const query = {
-    course: courseId,
+    // course: courseId,
   };
   if (moduleId) query.module = moduleId;
   if (submoduleId) query.submodule = submoduleId;
 
-  const courseVideos = await VideoModel.find(query).select("_id");
+  // const courseVideos = await VideoModel.find(query).select("_id");
 
   let query2 = {
-    video: {
-      $in: courseVideos.map((video) => video._id),
-    },
+    // video: {
+    //   $in: courseVideos.map((video) => video._id),
+    // },
     isRevoked: false,
   };
 
@@ -191,7 +190,7 @@ exports.getSubmittedAssignments = async (req, res) => {
     },
     {
       // convert array to obj(single element)
-      $unwind: "$user",
+      $unwind: { path: "$user", preserveNullAndEmptyArrays: true },
     },
     {
       // Fetch assignment details
@@ -220,7 +219,7 @@ exports.getSubmittedAssignments = async (req, res) => {
             },
           },
           {
-            $unwind: "$module",
+            $unwind: { path: "$module", preserveNullAndEmptyArrays: true },
           },
           {
             // Fetch submodule details , assignment belongs to
@@ -241,7 +240,7 @@ exports.getSubmittedAssignments = async (req, res) => {
             },
           },
           {
-            $unwind: "$submodule",
+            $unwind: { path: "$submodule", preserveNullAndEmptyArrays: true },
           },
 
           {
@@ -257,7 +256,7 @@ exports.getSubmittedAssignments = async (req, res) => {
     },
     {
       // convert array to obj(single element)
-      $unwind: "$video",
+      $unwind: { path: "$video", preserveNullAndEmptyArrays: true },
     },
 
     {
@@ -330,41 +329,13 @@ exports.getSubmittedAssignments = async (req, res) => {
     },
   ]);
 
-  // Fetch submodules of this course for filtering
-  const submodulesPromise = CourseModel.aggregate([
-    {
-      $match: {
-        _id: new mongoose.Types.ObjectId(courseId),
-      },
-    },
-
-    {
-      $lookup: {
-        from: "coursemodules",
-        localField: "_id",
-        foreignField: "course",
-        as: "modules",
-      },
-    },
-    {
-      $unwind: "$modules",
-    },
-    {
-      $lookup: {
-        from: "submodules",
-        localField: "modules._id",
-        foreignField: "module",
-        as: "submodules",
-      },
-    },
-    {
-      $unwind: "$submodules",
-    },
+  // Fetch submodules of all courses for filtering
+  const submodulesPromise = SubmoduleModel.aggregate([
     {
       $project: {
         _id: 0,
-        value: `$submodules._id`,
-        key: `$submodules.name`,
+        value: `$_id`,
+        key: `$name`,
       },
     },
   ]);
@@ -619,6 +590,114 @@ exports.subscribedCourseAssignments = async (req, res) => {
     message: "Assignments fetched successfully",
     data: {
       assigments,
+    },
+  });
+};
+
+exports.getUserAssignments = async (req, res) => {
+  const userId = req.params.id;
+  const { currentPage } = req.query;
+
+  const page = currentPage || 1;
+  const limit = 4;
+  const skip = (page - 1) * limit;
+
+  const assigmentsResponse = SubmittedAssignmentModel.aggregate([
+    {
+      $match: { user: new mongoose.Types.ObjectId(userId), isRevoked: false },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        let: { videoId: "$video" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$videoId"] },
+            },
+          },
+          {
+            $lookup: {
+              from: "courses",
+              foreignField: "_id",
+              localField: "course",
+              pipeline: [],
+              as: "course",
+            },
+          },
+          {
+            $project: {
+              title: 1,
+              course: 1,
+              sequence: 1,
+              submodule: 1,
+            },
+          },
+        ],
+        as: "video",
+      },
+    },
+    {
+      $set: {
+        video: { $arrayElemAt: ["$video", 0] },
+      },
+    },
+    {
+      $lookup: {
+        from: "submodules",
+        localField: "video.submodule",
+        foreignField: "_id",
+        as: "submodule",
+      },
+    },
+    {
+      $set: {
+        submodule: { $arrayElemAt: ["$submodule", 0] },
+      },
+    },
+    {
+      $addFields: {
+        videoSequence: "$video.sequence",
+        submoduleSequence: "$submodule.sequence",
+      },
+    },
+    {
+      $sort: {
+        submoduleSequence: 1,
+        videoSequence: 1,
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        submodule: 0,
+      },
+    },
+  ]);
+
+  const totalAssignmentsResponse = SubmittedAssignmentModel.countDocuments({
+    user: userId,
+    isRevoked: false,
+  });
+
+  const [assigments, totalAssignments] = await Promise.all([
+    assigmentsResponse,
+    totalAssignmentsResponse,
+  ]);
+  const pagesCount = Math.ceil(totalAssignments / limit);
+
+  return res.status(200).json({
+    success: true,
+    message: "Submitted assigments fetched successfully",
+    data: {
+      assigments,
+      totalAssignments,
+      pagesCount,
     },
   });
 };

@@ -15,6 +15,7 @@ const {
   awsUrl,
   StringToObjectId,
   generateUniqueId,
+  extractVideoURLKey,
 } = require("../../utils/helperFuns.js");
 const CourseModel = require("../@course_entity/course.model.js");
 const OrderModel = require("../@order_entity/order.model.js");
@@ -52,9 +53,9 @@ exports.getVideos = async (req, res, next) => {
         thumbnailUrl: {
           $concat: [awsUrl, "/", "$thumbnailUrl"],
         },
-        videoUrl: {
-          $concat: [awsUrl, "/", "$videoUrl"],
-        },
+        // videoUrl: {
+        //   $concat: [awsUrl, "/", "$videoUrl", "/1080pvideo_00001.ts"],
+        // },
       },
     },
   ]);
@@ -254,7 +255,7 @@ exports.getVideo = async (req, res, next) => {
 
   // Append bucket name
   video.thumbnailUrl = appendBucketName(video.thumbnailUrl);
-  video.videoUrl = appendBucketName(video.videoUrl);
+  // video.videoUrl = (video.videoUrl);
   if (video.assignment) video.assignment = appendBucketName(video.assignment);
   if (video?.submodule?.resource) {
     video.resource = appendBucketName(video.submodule.resource);
@@ -288,8 +289,11 @@ exports.saveVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter all required fields");
   }
 
-  // Extract keys from url
-  if (videoUrl) videoUrl = extractURLKey(videoUrl);
+  // videoUrl = decodeURIComponent(videoUrl);
+  // console.log("Video Url", videoUrl);
+
+  // // Extract keys from url
+  // if (videoUrl) videoUrl = extractVideoURLKey(videoUrl);
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
   if (assignment) assignment = extractURLKey(assignment);
 
@@ -733,7 +737,7 @@ const s3 = new aws.S3({
 exports.initiateMultipartUpload = async (req, res) => {
   const { videoExtension } = req.body;
 
-  const fileExtension = videoExtension || "mp4";
+  const fileExtension = videoExtension;
 
   const rawBytes = await randomBytes(16);
   // const videoName = rawBytes.toString("hex");
@@ -742,7 +746,7 @@ exports.initiateMultipartUpload = async (req, res) => {
   let key = `admin-uploads/${uuid}.${fileExtension}`;
 
   const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
+    Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
     Key: key,
     // ContentType: `video/${fileExtension}`,
     ContentType: mime.lookup(fileExtension) || "application/octet-stream",
@@ -770,7 +774,7 @@ exports.getUploadParts = async (req, res) => {
 
   for (let i = 1; i <= partCount; i++) {
     const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
       Key: key,
       UploadId: uploadId,
       PartNumber: i,
@@ -808,7 +812,7 @@ exports.completeMultipartUpload = async (req, res) => {
   }));
 
   const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
+    Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
     Key: key,
     UploadId: uploadId,
     MultipartUpload: {
@@ -836,7 +840,7 @@ exports.abortMultipartUpload = async (req, res) => {
   }
 
   const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
+    Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
     Key: key,
     UploadId: uploadId,
   };

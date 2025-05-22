@@ -112,7 +112,7 @@ exports.uploadImage = async (req, res) => {
   }
 
   // Generate image URL
-  const result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;
+  const result = `${awsUrl}/${uploadResult.Key}`;
 
   return res.status(StatusCodes.OK).json({
     success: true,
@@ -146,7 +146,7 @@ exports.uploadFile = async (req, res) => {
   const uploadResult = await s3AdminUploadv4(req.file, folder);
 
   // Generate image URL
-  const result = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com/${uploadResult.Key}`;
+  const result = `${awsUrl}/${uploadResult.Key}`;
 
   return res.status(StatusCodes.OK).json({
     success: true,
@@ -217,7 +217,7 @@ exports.staffSignin = async (req, res) => {
 };
 
 exports.getUsers = async (req, res) => {
-  let { search, currentPage, resultsPerPage } = req.query;
+  let { search, currentPage, resultsPerPage, selectedPlan } = req.query;
 
   // Query for aggregation
   let query = { isDeleted: false, role: "user" };
@@ -234,88 +234,192 @@ exports.getUsers = async (req, res) => {
   const page = currentPage || 1;
   const skip = (page - 1) * limit;
 
-  const usersPromise = userModel.aggregate([
-    {
-      $match: query,
-    },
-    {
-      $sort: {
-        createdAt: -1,
-      },
-    },
-    {
-      $skip: skip,
-    },
-    {
-      $limit: limit,
-    },
-    {
-      $lookup: {
-        from: "orders",
-        let: {
-          userId: "$_id",
+  if (selectedPlan == "clear") {
+    selectedPlan = null;
+  }
+
+  let usersPromise = null;
+  if (selectedPlan) {
+    usersPromise = OrderModel.aggregate([
+      {
+        $match: {
+          plan: new mongoose.Types.ObjectId(selectedPlan),
+          status: "Active",
+          expiry_date: { $gte: new Date() },
         },
-        pipeline: [
-          {
-            $match: {
-              $expr: {
-                $and: [
-                  { $eq: ["$user", "$$userId"] },
-                  { $eq: ["$status", "Active"] },
-                  { $gte: ["$expiry_date", new Date()] },
-                ],
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+      {
+        $lookup: {
+          from: "users",
+          let: {
+            userId: "$user",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$userId"] },
               },
             },
-          },
-          {
-            $project: {
-              plan: 1,
+            {
+              $lookup: {
+                from: "certificates",
+
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: {
+                        $and: [
+                          { $eq: ["$user", "$$userId"] },
+                          { $eq: ["$isIssued", true] },
+                        ],
+                      },
+                    },
+                  },
+                ],
+                as: "certificates",
+              },
             },
+            {
+              $project: {
+                email: 1,
+                name: 1,
+                mobile: 1,
+                certificates: 1,
+              },
+            },
+          ],
+          as: "user",
+        },
+      },
+      {
+        $unwind: "$user",
+        // $set: { user: { $arrayElemAt: ["$user", 0] } },
+      },
+      {
+        $project: {
+          _id: "$user._id",
+          name: { $ifNull: ["$user.name", null] },
+          email: "$user.email",
+          mobile: { $ifNull: ["$user.mobile", null] },
+          plan: { $ifNull: ["$plan", null] },
+          certificates: "$user.certificates",
+        },
+      },
+    ]);
+  } else {
+    usersPromise = userModel.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+      {
+        $lookup: {
+          from: "orders",
+          let: {
+            userId: "$_id",
           },
-        ],
-        as: "order",
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$user", "$$userId"] },
+                    { $eq: ["$status", "Active"] },
+                    { $gte: ["$expiry_date", new Date()] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                plan: 1,
+              },
+            },
+          ],
+          as: "order",
+        },
       },
-    },
 
-    {
-      $set: {
-        plan: { $arrayElemAt: ["$order.plan", 0] },
+      {
+        $set: {
+          plan: { $arrayElemAt: ["$order.plan", 0] },
+        },
       },
-    },
 
-    {
-      $lookup: {
-        from: "certificates",
-        foreignField: "user",
-        localField: "_id",
+      {
+        $lookup: {
+          from: "certificates",
+          foreignField: "user",
+          localField: "_id",
 
-        pipeline: [
-          {
-            $match: { isIssued: true },
-          },
-        ],
-        as: "certificates",
+          pipeline: [
+            {
+              $match: { isIssued: true },
+            },
+          ],
+          as: "certificates",
+        },
       },
-    },
 
-    {
-      $project: {
-        name: { $ifNull: ["$name", null] },
-        email: 1,
-        mobile: { $ifNull: ["$mobile", null] },
-        plan: { $ifNull: ["$plan", null] },
-        certificates: 1,
+      {
+        $project: {
+          name: { $ifNull: ["$name", null] },
+          email: 1,
+          mobile: { $ifNull: ["$mobile", null] },
+          plan: { $ifNull: ["$plan", null] },
+          certificates: 1,
+        },
       },
-    },
-  ]);
+    ]);
+  }
 
-  const totalUsersPromise = userModel.countDocuments(query);
+  let totalUsersPromise = null;
+  if (selectedPlan) {
+    totalUsersPromise = OrderModel.aggregate([
+      {
+        $match: {
+          plan: new mongoose.Types.ObjectId(selectedPlan),
+          status: "Active",
+          // expiry_date: { $gte: new Date() },
+        },
+      },
+      {
+        $count: "usersCount",
+      },
+    ]);
+  } else {
+    totalUsersPromise = userModel.countDocuments(query);
+  }
 
   const [users, totalUsers] = await Promise.all([
     usersPromise,
     totalUsersPromise,
   ]);
-  const pagesCount = Math.ceil(totalUsers / limit) || 1;
+
+  const usersCount = totalUsers[0]?.usersCount || totalUsers;
+  const pagesCount = Math.ceil(usersCount / limit) || 1;
 
   return res.status(StatusCodes.OK).json({
     success: true,
@@ -409,9 +513,41 @@ exports.userDetails = async (req, res) => {
     },
 
     {
+      $lookup: {
+        from: "certificates",
+        let: {
+          userId: "$_id",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$user", "$$userId"] },
+            },
+          },
+          {
+            $project: {
+              completionTime: 1,
+              completionDate: "$createdAt",
+              path: {
+                $concat: [awsUrl, "/", "$path"],
+              },
+            },
+          },
+        ],
+        as: "certificate",
+      },
+    },
+    {
+      $set: {
+        certificate: { $arrayElemAt: ["$certificate", 0] },
+      },
+    },
+
+    {
       $project: {
         name: 1,
         email: 1,
+        certificate: 1,
         avatar: 1,
         mobile: 1,
         transactions: 1,
@@ -431,6 +567,7 @@ exports.userDetails = async (req, res) => {
     {
       $project: {
         plan: 1,
+        createdAt: 1,
         expiry_date: 1,
       },
     },

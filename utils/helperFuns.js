@@ -69,12 +69,21 @@ exports.filterUserData = (user) => {
 exports.extractURLKey = (url) => {
   return url.replace(/^https?:\/\/[^/]+\/([^?]+)(\?.*)?$/, "$1");
 };
+exports.extractVideoURLKey = (url) => {
+  const fileName = url.split("/").pop();
+  return fileName.replace(/\.[^/.]+$/, "");
+};
 
-exports.awsUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_BUCKET_REGION}.amazonaws.com`;
+exports.awsUrl = `https://dcays3srybill.cloudfront.net`;
 
 // Append AWS bucket name before the file path
 exports.appendBucketName = (url) => {
   return `${exports.awsUrl}/${url}`;
+};
+
+exports.appendVideoCDN = (url) => {
+  const videoUUID = url.split("/")[1];
+  return `${exports.awsUrl}/${videoUUID}/1080pvideo_00001.ts`;
 };
 
 exports.StringToObjectId = (str) => {

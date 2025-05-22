@@ -6,6 +6,9 @@ const VideoModel = require("../@video_entity/video.model");
 const BadRequestError = require("../../errors/bad-request");
 const { NotFoundError } = require("../../errors");
 const { default: mongoose } = require("mongoose");
+const orderModel = require("../@order_entity/order.model");
+const PlanModel = require("../@plan_entity/plan.model");
+const CourseModel = require("../@course_entity/course.model");
 
 // Update video progress
 exports.updateVideoProgress = async (req, res, next) => {
@@ -161,5 +164,118 @@ exports.getCourseProgress = async (req, res) => {
     success: true,
     message: "Course progress fetched successfully",
     data: { courseProgress },
+  });
+};
+
+exports.yourProgress = async (req, res) => {
+  const userId = req.user._id;
+
+  const plansPromise = PlanModel.find().lean();
+
+  const activePlanPromise = orderModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        status: "Active",
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        let: {
+          planId: "$plan",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$planId"] },
+            },
+          },
+        ],
+        as: "plan",
+      },
+    },
+    {
+      $set: { plan: { $arrayElemAt: ["$plan", 0] } },
+    },
+    {
+      $project: {
+        _id: 0,
+        planId: "$plan._id",
+        level: "$plan.level",
+      },
+    },
+  ]);
+
+  const [plans, [activePlan]] = await Promise.all([
+    plansPromise,
+    activePlanPromise,
+  ]);
+
+  if (!activePlan) {
+    throw new BadRequestError("No active plan");
+  }
+
+  const coveredPlans = [];
+  plans.forEach((plan) => {
+    if (plan.level <= activePlan.level) {
+      coveredPlans.push(plan._id);
+    }
+  });
+
+  const covererdCourses = await CourseModel.find({
+    plan: { $in: coveredPlans },
+  }).select("_id");
+  const coursesArray = covererdCourses.map((course) => course._id);
+
+  const [videoprogress] = await VideoModel.aggregate([
+    {
+      $match: {
+        course: { $in: coursesArray },
+      },
+    },
+    {
+      $lookup: {
+        from: "videoprogresses",
+        let: { videoId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$video", "$$videoId"] },
+                  { $eq: ["$user", userId] },
+                  { $eq: ["$isCompleted", true] },
+                ],
+              },
+            },
+          },
+        ],
+        as: "progress",
+      },
+    },
+
+    {
+      $group: {
+        _id: "null",
+        totalVideos: { $sum: 1 },
+        completedVideos: {
+          $sum: {
+            $cond: [{ $gt: [{ $size: "$progress" }, 0] }, 1, 0],
+          },
+        },
+      },
+    },
+  ]);
+
+  const yourProgress = {
+    completedVideos: videoprogress?.completedVideos,
+    totalVideos: videoprogress?.totalVideos,
+  };
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Course video progress fetched successfully",
+    data: { yourProgress },
   });
 };

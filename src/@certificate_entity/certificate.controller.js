@@ -283,6 +283,9 @@ exports.saveUserProgress = async (userId) => {
   if (activeOrder) {
     const activePlan = activeOrder.plan;
     const user = { _id: activeOrder.user };
+    const completionTime = Math.floor(
+      (new Date() - activeOrder.createdAt) / 1000
+    );
 
     const { progress, averageAssigmentsScore } = await calculateProgress({
       user,
@@ -299,6 +302,7 @@ exports.saveUserProgress = async (userId) => {
         existingProgress.averageAssigmentsScore = averageAssigmentsScore;
         existingProgress.totalAssignments = progress[0].totalAssignments;
         existingProgress.scoresSum = progress[0].scoresSum;
+        existingProgress.completionTime = completionTime;
 
         await existingProgress.save();
       } else {
@@ -308,6 +312,7 @@ exports.saveUserProgress = async (userId) => {
           averageAssigmentsScore,
           totalAssignments: progress[0].totalAssignments,
           scoresSum: progress[0].scoresSum,
+          completionTime,
         });
       }
     }

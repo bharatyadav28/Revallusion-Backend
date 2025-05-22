@@ -45,7 +45,7 @@ exports.s3UploadVideo = async (file, id, access) => {
   return data;
 };
 
-exports.generateUploadURL = async (fileExtension = "mp4") => {
+exports.generateUploadURL = async (fileExtension) => {
   const rawBytes = await randomBytes(16);
   const videoName = rawBytes.toString("hex");
 
@@ -53,7 +53,7 @@ exports.generateUploadURL = async (fileExtension = "mp4") => {
   let key = `admin-uploads/${uuid}.${fileExtension}`;
 
   const params = {
-    Bucket: process.env.AWS_BUCKET_NAME,
+    Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
     Key: key,
     Expires: 2400,
     // ContentType: `video/${fileExtension}`,

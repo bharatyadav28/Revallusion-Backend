@@ -1,6 +1,7 @@
 const path = require("path");
 const fs = require("fs");
 const PDFDocument = require("pdfkit");
+const JSZip = require("jszip");
 
 const TransactionModel = require("./transaction.model");
 const {
@@ -14,13 +15,14 @@ const sendEmail = require("../../utils/sendEmail");
 exports.getAllTransactions = async (req, res) => {
   let { search, paymentId, from, to, currentPage } = req.query;
 
-  const query = {};
+  const query = { status: "Completed" };
   search = search?.trim();
   if (search) {
     const searchRegExp = new RegExp(search, "i");
     query.$or = [
       { "user.name": { $regex: searchRegExp } },
       { "user.email": { $regex: searchRegExp } },
+      { payment_id: { $regex: searchRegExp } },
     ];
   }
 
@@ -35,7 +37,7 @@ exports.getAllTransactions = async (req, res) => {
     }
   }
 
-  if (paymentId) query.payment_id = paymentId;
+  // if (paymentId) query.payment_id = paymentId;
 
   const page = currentPage || 1;
   const limit = 8;
@@ -345,5 +347,44 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
         }
       });
     });
+  });
+};
+
+exports.getFilteredTransactions = async (req, res, next) => {
+  const { from, to } = req.query;
+  const query = { status: "Completed" };
+
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = new Date(from);
+    if (to) {
+      const endOfDay = new Date(to);
+      // Includes whole day
+      endOfDay.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = endOfDay;
+    }
+  }
+
+  const transactions = await TransactionModel.aggregate([
+    {
+      $match: query,
+    },
+    {
+      $set: {
+        invoice_url: { $concat: [awsUrl, "/", "$invoice_url"] },
+      },
+    },
+    {
+      $project: {
+        invoice_url: 1,
+        payment_id: 1,
+      },
+    },
+  ]);
+
+  res.status(200).json({
+    success: true,
+    message: "Transactions fetched successfully",
+    data: { transactions },
   });
 };
