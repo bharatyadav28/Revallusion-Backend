@@ -5,6 +5,7 @@ const ModuleSchema = new mongoose.Schema({
     type: String,
     required: [true, "Please enter module name"],
     trim: true,
+    unique: [true, "Module name must be unique"],
   },
   description: {
     type: String,

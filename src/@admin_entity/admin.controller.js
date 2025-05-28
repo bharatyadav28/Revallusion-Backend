@@ -227,7 +227,13 @@ exports.getUsers = async (req, res) => {
     query.$or = [
       { name: { $regex: searchRegExp } },
       { email: { $regex: searchRegExp } },
+      { mobile: { $regex: searchRegExp } },
     ];
+  }
+
+  let query2 = {};
+  if (selectedPlan === "noPlan") {
+    query2 = { order: { $eq: [] } };
   }
 
   const limit = resultsPerPage || 8;
@@ -239,7 +245,7 @@ exports.getUsers = async (req, res) => {
   }
 
   let usersPromise = null;
-  if (selectedPlan) {
+  if (selectedPlan && selectedPlan !== "noPlan") {
     usersPromise = OrderModel.aggregate([
       {
         $match: {
@@ -318,6 +324,86 @@ exports.getUsers = async (req, res) => {
         },
       },
     ]);
+  } else if (selectedPlan === "noPlan") {
+    usersPromise = userModel.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "orders",
+          let: {
+            userId: "$_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$user", "$$userId"] },
+                    { $eq: ["$status", "Active"] },
+                    { $gte: ["$expiry_date", new Date()] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                plan: 1,
+              },
+            },
+          ],
+          as: "order",
+        },
+      },
+      {
+        $match: query2,
+      },
+
+      {
+        $skip: skip,
+      },
+      {
+        $limit: limit,
+      },
+
+      {
+        $set: {
+          plan: { $arrayElemAt: ["$order.plan", 0] },
+        },
+      },
+
+      {
+        $lookup: {
+          from: "certificates",
+          foreignField: "user",
+          localField: "_id",
+
+          pipeline: [
+            {
+              $match: { isIssued: true },
+            },
+          ],
+          as: "certificates",
+        },
+      },
+
+      {
+        $project: {
+          name: { $ifNull: ["$name", null] },
+          email: 1,
+          mobile: { $ifNull: ["$mobile", null] },
+          plan: { $ifNull: ["$plan", null] },
+          certificates: 1,
+        },
+      },
+    ]);
   } else {
     usersPromise = userModel.aggregate([
       {
@@ -361,6 +447,9 @@ exports.getUsers = async (req, res) => {
           as: "order",
         },
       },
+      {
+        $match: query2,
+      },
 
       {
         $set: {
@@ -396,7 +485,7 @@ exports.getUsers = async (req, res) => {
   }
 
   let totalUsersPromise = null;
-  if (selectedPlan) {
+  if (selectedPlan && selectedPlan !== "noPlan") {
     totalUsersPromise = OrderModel.aggregate([
       {
         $match: {
@@ -405,6 +494,53 @@ exports.getUsers = async (req, res) => {
           // expiry_date: { $gte: new Date() },
         },
       },
+      {
+        $count: "usersCount",
+      },
+    ]);
+  } else if (selectedPlan === "noPlan") {
+    totalUsersPromise = userModel.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "orders",
+          let: {
+            userId: "$_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$user", "$$userId"] },
+                    { $eq: ["$status", "Active"] },
+                    { $gte: ["$expiry_date", new Date()] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                plan: 1,
+              },
+            },
+          ],
+          as: "order",
+        },
+      },
+
+      {
+        $match: query2,
+      },
+
       {
         $count: "usersCount",
       },

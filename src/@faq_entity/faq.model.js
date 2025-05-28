@@ -6,6 +6,7 @@ const FaqSchema = new mongoose.Schema(
       type: String,
       required: [true, "Please provide question title"],
       trim: true,
+      unique: [true, "Title must be unique"],
     },
     description: {
       type: String,

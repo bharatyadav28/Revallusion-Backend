@@ -13,11 +13,24 @@ const {
 const sendEmail = require("../../utils/sendEmail");
 const { default: mongoose } = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
+const { BadRequestError } = require("../../errors");
 
 exports.getAllTransactions = async (req, res) => {
-  let { search, paymentId, from, to, currentPage } = req.query;
+  let { search, from, to, currentPage, sortByAmount, sortByDate, status } =
+    req.query;
 
-  const query = { status: "Completed" };
+  if (from && to) {
+    if (new Date(from) > new Date(to)) {
+      throw new BadRequestError(`"To" date should be greater than "from" date`);
+    }
+  }
+
+  // const query = { status: "Completed" };
+  const query = {};
+  if (status === "Completed" || status === "Failed") {
+    query.status = status;
+  }
+
   search = search?.trim();
   if (search) {
     const searchRegExp = new RegExp(search, "i");
@@ -37,6 +50,16 @@ exports.getAllTransactions = async (req, res) => {
       endOfDay.setHours(23, 59, 59, 999);
       query.createdAt.$lte = endOfDay;
     }
+  }
+
+  let sort = {
+    createdAt: -1,
+  };
+  if (sortByAmount) {
+    sort = { amount: sortByAmount === "asc" ? 1 : -1, ...sort };
+  }
+  if (sortByDate) {
+    sort = { ...sort, createdAt: sortByDate === "asc" ? 1 : -1 };
   }
 
   // if (paymentId) query.payment_id = paymentId;
@@ -107,9 +130,7 @@ exports.getAllTransactions = async (req, res) => {
       $match: query,
     },
     {
-      $sort: {
-        createdAt: -1,
-      },
+      $sort: sort,
     },
 
     {

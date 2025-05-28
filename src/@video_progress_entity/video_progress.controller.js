@@ -203,6 +203,7 @@ exports.yourProgress = async (req, res) => {
         _id: 0,
         planId: "$plan._id",
         level: "$plan.level",
+        name: "$plan.plan_type",
       },
     },
   ]);
@@ -276,6 +277,6 @@ exports.yourProgress = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "Course video progress fetched successfully",
-    data: { yourProgress },
+    data: { yourProgress, planName: activePlan?.name },
   });
 };

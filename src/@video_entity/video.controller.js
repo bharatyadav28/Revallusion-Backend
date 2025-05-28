@@ -192,7 +192,10 @@ exports.getVideo = async (req, res, next) => {
 
   // Fetch video
   const videoPromise = VideoModel.findOne(
-    { _id: videoId, isDeleted: false },
+    {
+      _id: videoId,
+      //  isDeleted: false
+    },
     {
       title: 1,
       description: 1,

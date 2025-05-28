@@ -24,11 +24,11 @@ exports.getAllLatestTutorials = async (req, res) => {
         foreignField: "_id",
         as: "video",
         pipeline: [
-          {
-            $match: {
-              isDeleted: false,
-            },
-          },
+          // {
+          //   $match: {
+          //     isDeleted: false,
+          //   },
+          // },
           {
             $addFields: {
               thumbnailUrl: {

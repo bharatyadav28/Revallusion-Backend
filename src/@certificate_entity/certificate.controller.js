@@ -454,7 +454,9 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
   }
 
   if (!isAdmin && !currentCertificate) {
-    throw new BadRequestError("Please complete the course first");
+    throw new BadRequestError(
+      "Either course is not completed or assigments are pending"
+    );
   }
 
   if (isAdmin) {
@@ -481,6 +483,7 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
     }
   }
 
+  user.name = name;
   const data = await createCertificateBuffer({
     user,
     averageAssigmentsScore: currentCertificate,
@@ -506,9 +509,21 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
 
 // By user
 exports.generateMyCertificate = async (req, res) => {
-  const { name, planId } = req.body;
+  const { name } = req.body;
   const userId = req.user._id;
 
+  const activeOrder = await OrderModel.findOne({
+    user: userId,
+    status: "Active",
+  });
+
+  if (!activeOrder) {
+    throw new BadRequestError("No active plan found");
+  }
+
+  const planId = activeOrder?.plan;
+
+  console.log("Name:", name);
   await createCertificate({
     name,
     planId,
@@ -544,7 +559,7 @@ exports.getCertificates = async (req, res) => {
   const certificates = await CertificateModel.find({
     user: userId,
     isIssued: true,
-  });
+  }).select("path");
 
   return res.status(StatusCodes.OK).json({
     success: true,
