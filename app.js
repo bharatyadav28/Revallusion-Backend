@@ -31,6 +31,7 @@ app.use(
       "https://ravallusion-repo-mine.vercel.app",
       "https://www.ravallusion.com",
       "https://ravallusion.com",
+      "https://ravallusion-frontend.vercel.app",
     ],
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
