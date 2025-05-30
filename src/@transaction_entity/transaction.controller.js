@@ -174,7 +174,7 @@ exports.getAllTransactions = async (req, res) => {
 
 exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
   return new Promise((resolve, reject) => {
-    const logoPath = path.join(__dirname, "../../public", "/logo.png");
+    const logoPath = path.join(__dirname, "../../public", "/favicon.png");
     const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
     const doc = new PDFDocument();
     const writeStream = fs.createWriteStream(tempFilePath);
@@ -183,7 +183,7 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
 
     doc.rect(50, 50, 500, 650).stroke();
 
-    // doc.image(logoPath, 330, 70, { width: 200, height: 60 });
+    doc.image(logoPath, 430, 70, { width: 100, height: 60 });
 
     doc.fontSize(12).text("RAVALLUSION TRAINING ACADEMY LLP", 70, 150);
     doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);

@@ -15,13 +15,16 @@ const {
   filterUserData,
   awsUrl,
 } = require("../../utils/helperFuns");
-const { s3AdminUploadv4 } = require("../../utils/s3");
+const { s3AdminUploadv4, s3Uploadv4 } = require("../../utils/s3");
 const { instance } = require("../../app");
 const {
   generateUserCertificates,
 } = require("../@certificate_entity/certificate.controller");
 const CertificateModel = require("../@certificate_entity/certificate.model");
 const QueryModel = require("../@query_entity/query.model");
+const {
+  sendInvoice,
+} = require("../@transaction_entity/transaction.controller");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -860,7 +863,6 @@ exports.updateUser = async (req, res) => {
         let expiry_date = new Date();
         expiry_date.setDate(expiry_date.getDate() + planValidityInDays);
 
-        // Razorpay order
         const amount = existingPlan.inr_price;
         const paise = Number(amount) * 100;
         var options = {
@@ -880,6 +882,35 @@ exports.updateUser = async (req, res) => {
         });
 
         await newOrder.save({ session });
+
+        console.log("Payment id", newOrder, amount);
+
+        const newTransaction = new TransactionModel({
+          order: newOrder?._id,
+          user: existingUser._id,
+          payment_id: newOrder?._id,
+          amount: amount,
+          gateway: "Manual",
+          status: "Completed",
+        });
+        const transactionPromise = newTransaction.save({ session });
+        const countTransactionsPromise = TransactionModel.countDocuments();
+
+        const [transaction, countTransactions] = await Promise.all([
+          transactionPromise,
+          countTransactionsPromise,
+        ]);
+
+        const data = await sendInvoice({
+          user: existingUser,
+          transaction,
+          invoice_no: countTransactions + 1,
+          plan_type: existingPlan.plan_type,
+        });
+
+        const result = await s3Uploadv4(data, "invoices", "invoice");
+        transaction.invoice_url = result?.Key;
+        await transaction.save({ session });
       }
 
       await session.commitTransaction();

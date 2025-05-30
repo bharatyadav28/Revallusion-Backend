@@ -523,7 +523,6 @@ exports.generateMyCertificate = async (req, res) => {
 
   const planId = activeOrder?.plan;
 
-  console.log("Name:", name);
   await createCertificate({
     name,
     planId,
