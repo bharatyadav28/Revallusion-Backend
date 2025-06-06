@@ -54,9 +54,9 @@ exports.getCarousals = async (req, res) => {
               thumbnailUrl: {
                 $concat: [awsUrl, "/", "$thumbnailUrl"],
               },
-              videoUrl: {
-                $concat: [awsUrl, "/", "$videoUrl"],
-              },
+              // videoUrl: {
+              //   $concat: [awsUrl, "/", "$videoUrl"],
+              // },
             },
           },
 
