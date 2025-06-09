@@ -143,9 +143,13 @@ exports.updateDashboardCarousal = async (req, res) => {
           );
         }
 
-        // Update the submodule's sequence
-        carousal.sequence = sequence;
-        await carousal.save({ session });
+        await DashboardCarousalModel.updateOne(
+          { _id: carousal._id },
+          {
+            $set: { sequence },
+          },
+          { session }
+        );
       });
 
       await session.endSession();
