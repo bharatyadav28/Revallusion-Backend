@@ -387,8 +387,8 @@ exports.updateVideo = async (req, res, next) => {
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
     !video?.course?.equals(StringToObjectId(course)) ||
-    video.module !== (module || null) ||
-    video.submodule !== (submodule || null);
+    !video?.module?.equals(StringToObjectId(module)) ||
+    !video?.submodule?.equals(StringToObjectId(submodule));
 
   if (title) video.title = title;
   if (description) video.description = description;
@@ -398,6 +398,25 @@ exports.updateVideo = async (req, res, next) => {
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists
+    let targetCourse = null;
+    let isTargetCourseFree = false;
+
+    if (course) {
+      targetCourse = await CourseModel.findOne({
+        _id: course,
+      }).select("isFree");
+
+      if (!targetCourse) {
+        course = null;
+      }
+
+      isTargetCourseFree = targetCourse?.isFree || false;
+
+      if (targetCourse && !isTargetCourseFree) {
+        if (!module) throw new BadRequestError("Please select tool");
+        if (!submodule) throw new BadRequestError("Please select topic");
+      }
+    }
 
     const session = await mongoose.startSession();
 
@@ -422,16 +441,6 @@ exports.updateVideo = async (req, res, next) => {
             { session }
           );
         }
-
-        const targetCourse = await CourseModel.findOne({
-          _id: course,
-        }).select("isFree");
-
-        if (!targetCourse) {
-          course = null;
-        }
-
-        const isTargetCourseFree = targetCourse?.isFree || false;
 
         // Get new sequence for target location
         const newSequence = await VideoModel.getNextSequence({
