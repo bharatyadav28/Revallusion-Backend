@@ -300,17 +300,17 @@ exports.getSubscribedPlanCourse = async (req, res) => {
       throw new NotFoundError("Requested plan may not exists");
     }
 
-    const currentPlanLevel = order.plan.level;
+    // const currentPlanLevel = order.plan.level;
 
     // Check if user has access to this course
-    if (
-      currentPlanLevel === Number(process.env.BEGINNER_PLAN) &&
-      requestedPlan.level === Number(process.env.ADVANCE_PLAN)
-    ) {
-      throw new BadRequestError(
-        "Please upgrade your plan to access this course"
-      );
-    }
+    // if (
+    //   currentPlanLevel === Number(process.env.BEGINNER_PLAN) &&
+    //   requestedPlan.level === Number(process.env.ADVANCE_PLAN)
+    // ) {
+    //   throw new BadRequestError(
+    //     "Please upgrade your plan to access this course"
+    //   );
+    // }
   }
 
   const [courseData] = await courseModel.aggregate([
