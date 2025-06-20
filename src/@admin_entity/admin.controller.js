@@ -1015,7 +1015,10 @@ exports.deleteUser = async (req, res) => {
 };
 
 exports.getDashBoardContent = async (req, res) => {
-  const userPromise = userModel.countDocuments({ isDeleted: false });
+  const userPromise = userModel.countDocuments({
+    isDeleted: false,
+    role: "user",
+  });
 
   const activeOrderPromise = OrderModel.aggregate([
     {
@@ -1131,7 +1134,7 @@ exports.getDashBoardContent = async (req, res) => {
     data: {
       usersCount,
       activeOrder,
-      plansUpgraded: ordersUpgraded?.[0].totalUpgradedUsers,
+      plansUpgraded: ordersUpgraded?.[0]?.totalUpgradedUsers,
       queries,
       revenues: revenues?.[0],
     },
