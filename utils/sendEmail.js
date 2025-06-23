@@ -7,7 +7,7 @@ sg.setApiKey(api);
 const sendEmail = async ({ to, subject, html, attachments }) => {
   const isProdEnv = process.env.NODE_ENV === "production";
 
-  if (false) {
+  if (true) {
     const mailOptions = {
       to,
       from: "namaskaram@stringgeo.com",

@@ -71,7 +71,7 @@ class OTPManager {
     } else if (mobile) {
       // Send OTP via SMS
       const message = `Your verification code is: ${otp}`;
-      await sendSMS({ to: mobile, body: message });
+      // await sendSMS({ to: mobile, body: message });
     }
 
     return { success: true };
