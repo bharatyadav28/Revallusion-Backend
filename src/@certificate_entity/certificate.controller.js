@@ -400,7 +400,7 @@ const createCertificateBuffer = async ({
             await sendEmail({
               to: user.email,
               subject: "Certificate",
-              html: "Testing certififcate",
+              html: "Certififcate",
               attachments,
             });
 
