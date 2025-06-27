@@ -387,7 +387,6 @@ const createCertificateBuffer = async ({
           console.log("Error", data, err);
         } else {
           try {
-            // Todo:Send email
             const attachments = [
               {
                 filename: `certificate.pdf`,
