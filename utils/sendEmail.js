@@ -5,7 +5,8 @@ const api = process.env.SENDGRIP_API;
 sg.setApiKey(api);
 
 const sendEmail = async ({ to, subject, html, attachments }) => {
-  const isProdEnv = process.env.NODE_ENV === "production";
+  // const isProdEnv =  process.env.NODE_ENV === "production";
+  const isProdEnv = true;
 
   if (isProdEnv) {
     const mailOptions = {
