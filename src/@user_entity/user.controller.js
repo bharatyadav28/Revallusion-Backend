@@ -93,7 +93,7 @@ exports.signin = async (req, res) => {
 
     return res.status(StatusCodes.CREATED).json({
       success: true,
-      message: "Otp sent to registered email or phone number",
+      message: "Otp sent to registered email",
       data: {
         user: {
           _id: user._id,

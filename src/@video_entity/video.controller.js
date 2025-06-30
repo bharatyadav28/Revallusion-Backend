@@ -790,7 +790,7 @@ exports.getUploadParts = async (req, res) => {
       Key: key,
       UploadId: uploadId,
       PartNumber: i,
-      Expires: 3600,
+      Expires: 60 * 60 * 24,
     };
 
     const uploadURL = await s3.getSignedUrlPromise("uploadPart", params);
