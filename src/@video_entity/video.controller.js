@@ -218,7 +218,7 @@ exports.getVideo = async (req, res, next) => {
     })
     .lean();
 
-  const timestampsPromise = getVideoTimeStamps(videoId);
+  // const timestampsPromise = getVideoTimeStamps(videoId);
 
   // Fetch user subscription
   const orderPromise = OrderModel.findOne({
@@ -228,11 +228,7 @@ exports.getVideo = async (req, res, next) => {
     .populate({ path: "plan", select: "_id level" })
     .lean();
 
-  const [video, timestamps, order] = await Promise.all([
-    videoPromise,
-    timestampsPromise,
-    orderPromise,
-  ]);
+  const [video, order] = await Promise.all([videoPromise, orderPromise]);
 
   if (!video) {
     throw new BadRequestError("Requested video may not exists");
@@ -689,7 +685,7 @@ exports.getVideoList = async (req, res, next) => {
 
   let query = {
     isDeleted: false,
-    $or: [{ module: { $exists: false } }, { module: null }],
+    // $or: [{ module: { $exists: false } }, { module: null }],
   };
 
   if (excludeVideos) {
@@ -698,9 +694,9 @@ exports.getVideoList = async (req, res, next) => {
 
   if (search) {
     query.$and = [
-      {
-        $or: [{ module: { $exists: false } }, { module: null }],
-      }, // Preserve module filter
+      // {
+      //   $or: [{ module: { $exists: false } }, { module: null }],
+      // },
       {
         $or: [
           { title: { $regex: search, $options: "i" } },

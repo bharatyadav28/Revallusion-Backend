@@ -21,6 +21,7 @@ const {
   saveUserProgress,
 } = require("../@certificate_entity/certificate.controller");
 const SubmoduleModel = require("../@submodule_entity/submodule.model");
+const userModel = require("../@user_entity/user.model");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
   // Upload image or document file only
@@ -127,8 +128,15 @@ exports.updateScore = async (req, res) => {
 // Get all submitted assignments
 exports.getSubmittedAssignments = async (req, res) => {
   // Filter params
-  const { moduleId, submoduleId, isGraded, resultPerPage, currentPage } =
+  const { moduleId, submoduleId, isGraded, resultPerPage, currentPage, email } =
     req.query;
+
+  const user = await userModel
+    .findOne({
+      email: email,
+      isDeleted: false,
+    })
+    .select("_id");
 
   // Filter assignments based on course, module and submodule
   const query = {
@@ -149,6 +157,7 @@ exports.getSubmittedAssignments = async (req, res) => {
   // Filter submitted assignments based on graded or not
   if (isGraded && isGraded === "yes") query2.score = { $gte: 0 };
   if (isGraded && isGraded === "no") query2.score = null;
+  if (email) query2.user = user?._id;
 
   const limit = Number(resultPerPage) || 8;
   const page = Number(currentPage) || 1;

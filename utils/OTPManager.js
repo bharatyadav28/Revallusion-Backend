@@ -53,7 +53,7 @@ class OTPManager {
       </div>
 
       <div style="color: #888888;">
-        <p style="margin-bottom: 40px;">Regards, <span style="color:#b19cd9;">Team Revallusion</span></p>
+        <p style="margin-bottom: 40px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
       </div>
     
     </div>`;

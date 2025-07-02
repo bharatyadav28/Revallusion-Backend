@@ -751,7 +751,7 @@ exports.createUser = async (req, res) => {
     throw new BadRequestError("Targeted plan doesnot exist");
 
   const body = { email };
-  if (mobile) body.mobile = mobile;
+  if (mobile) body.mobile = mobile.length > 10 ? mobile : "+91" + mobile;
   if (plan) body.plan = plan;
   if (name) body.name = name;
   const user = await userModel.create(body);
@@ -828,8 +828,14 @@ exports.updateUser = async (req, res) => {
     throw new BadRequestError("Targeted plan doesnot exist");
 
   const body = { email };
+  console.log("Mobile, ", mobile);
   if (name) body.name = name;
-  if (mobile) body.mobile = mobile;
+  if (mobile) {
+    let formattedMobile = mobile;
+    if (formattedMobile.length === 10)
+      formattedMobile = "+91" + formattedMobile;
+    body.mobile = formattedMobile;
+  }
 
   const updatedUser = await userModel.findByIdAndUpdate(userId, body, {
     runValidators: true,
