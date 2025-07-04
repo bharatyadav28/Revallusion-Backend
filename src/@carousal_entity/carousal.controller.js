@@ -81,6 +81,9 @@ exports.getCarousals = async (req, res) => {
 
     {
       $unwind: "$video",
+      // $set: {
+      //   video: { $arrayElemAt: ["$video", 0] },
+      // },
     },
   ]);
 

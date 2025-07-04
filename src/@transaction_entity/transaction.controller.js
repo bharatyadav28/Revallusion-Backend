@@ -175,7 +175,7 @@ exports.getAllTransactions = async (req, res) => {
 exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
   return new Promise((resolve, reject) => {
     const logoPath = path.join(__dirname, "../../public", "/favicon.png");
-    const tempFilePath = path.join("/tmp", `${user._id}.pdf`);
+    const tempFilePath = path.join("/tmp", `Ravallusion.pdf`);
     const doc = new PDFDocument();
     const writeStream = fs.createWriteStream(tempFilePath);
 
@@ -183,12 +183,12 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
 
     doc.rect(50, 50, 500, 650).stroke();
 
-    doc.image(logoPath, 430, 70, { width: 100, height: 60 });
+    doc.image(logoPath, 430, 70, { width: 100, height: 100 });
 
-    doc.fontSize(12).text("RAVALLUSION TRAINING ACADEMY LLP", 70, 150);
-    doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
-    doc.text("Mobile - 9008642633", 70, 190);
-    doc.text("Email - ravallusionacademy@gmail.com", 70, 210);
+    doc.fontSize(12).text("RAVALLUSION TRAINING ACADEMY LLP", 70, 190);
+    // doc.text("GSTIN - 37ABICS6540H1Z2", 70, 170);
+    doc.text("Mobile - 9008642633", 70, 210);
+    doc.text("Email - ravallusionacademy@gmail.com", 70, 230);
     doc.moveDown(2);
     doc.font("Helvetica-Bold").fontSize(24).text("Tax Invoice", {
       align: "center",
@@ -205,9 +205,14 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
     doc
       .font("Helvetica")
       .fontSize(12)
-      .text("Billing To: " + (user?.name || "NA"), xColumn1, yColumn1, {
-        lineGap: 5,
-      })
+      .text(
+        "Billing To: " + (user?.name || user?._id || "NA"),
+        xColumn1,
+        yColumn1,
+        {
+          lineGap: 5,
+        }
+      )
       .text("Contact No: " + (user?.mobile || "NA"), xColumn1, doc.y, {
         lineGap: 5,
       })
@@ -250,14 +255,8 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
     const cellPadding = 8;
 
     const tableData = [
-      ["Description", "SAC Code", `Amount =(Rs.)`],
-      [
-        `${plan_type}`,
-        "998433",
-        parseFloat(0.82 * transaction.amount).toFixed(2),
-      ],
-      ["IGST @ 18%", "", parseFloat(0.18 * transaction.amount).toFixed(2)],
-      ["Invoice Total", "", transaction.amount],
+      ["Description", `Amount =(Rs.)`],
+      [`${plan_type}`, transaction.amount],
     ];
 
     let tableTop = doc.y + tableMarginTop;
@@ -282,12 +281,12 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
     doc
       .fontSize(10)
       .text(`Amount in words (INR): ` + numberToWords(transaction.amount), 70)
-      .text(
-        "Note: The subscription amount is inclusive Goods and Service tax (GST) at rate of 18%.",
+      // .text(
+      //   "Note: The subscription amount is inclusive Goods and Service tax (GST) at rate of 18%.",
 
-        70
-      )
-      .text("Reverse Charge Applicability: No", 70)
+      //   70
+      // )
+      // .text("Reverse Charge Applicability: No", 70)
       .text("See Terms and Conditions on the www.ravallusion.com website", 70);
 
     doc.moveDown(4);
@@ -346,7 +345,7 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
           try {
             const attachments = [
               {
-                filename: `${user?.name || "user"}.pdf`,
+                filename: `${"Ravallusion"}.pdf`,
                 path: tempFilePath,
                 content: data.toString("base64"),
                 encoding: "base64",

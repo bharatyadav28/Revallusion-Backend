@@ -38,7 +38,8 @@ class OTPManager {
     if (email) {
       // Send OTP via email
       const message = `
-    <div style="font-family: 'Arial', sans-serif; text-align: center; background-color: #f4f4f4; margin-top: 15px; padding: 0;">
+    <div style="font-family: 'Arial', sans-serif; text-align: center; background-color: #f4f4f4; margin-top: 15px; padding: 0;
+    padding-bottom:10px;  ">
 
       <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);">
         <h1 style="color: #333333;">Hey ${name}! </h1>
@@ -52,8 +53,8 @@ class OTPManager {
         </p>
       </div>
 
-      <div style="color: #888888;">
-        <p style="margin-bottom: 40px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
+      <div style="color: #888888">
+        <p style="margin-bottom: 10px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
       </div>
     
     </div>`;

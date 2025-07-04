@@ -58,15 +58,22 @@ exports.attachCookiesToResponse = ({
   refreshToken,
   keepMeSignedIn,
 }) => {
-  res.cookie("accessToken", accessToken, {
-    ...cookieConfig,
-    expires: new Date(Date.now() + minTime),
-  });
+  const accessCookieConfig = keepMeSignedIn
+    ? {
+        ...cookieConfig,
+        expires: new Date(Date.now() + minTime),
+      }
+    : { ...cookieConfig };
 
-  res.cookie("refreshToken", refreshToken, {
-    ...cookieConfig,
-    expires: new Date(Date.now() + (keepMeSignedIn ? maxTime : minTime)),
-  });
+  const refreshCookieConfig = keepMeSignedIn
+    ? {
+        ...cookieConfig,
+        expires: new Date(Date.now() + maxTime),
+      }
+    : { ...cookieConfig };
+
+  res.cookie("accessToken", accessToken, accessCookieConfig);
+  res.cookie("refreshToken", refreshToken, refreshCookieConfig);
 };
 
 // Add access token to cookies(incase access token is invalid but refresh token is valid )

@@ -254,8 +254,8 @@ exports.updateSessionAndCreateTokens = async ({
   if (existingSessionIndex >= 0) {
     user.activeSessions[existingSessionIndex] = sessionInfo;
   } else {
-    if (user.role !== "user" && user.activeSessions.length >= 5) {
-      // Only 5 active logins for admin/staff
+    if (user.role !== "user" && user.activeSessions.length >= 10) {
+      // Only 10 active logins for admin/staff
       user.activeSessions.shift();
     }
     user.activeSessions.push(sessionInfo);

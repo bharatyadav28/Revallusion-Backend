@@ -74,7 +74,7 @@ exports.extractVideoURLKey = (url) => {
   return fileName.replace(/\.[^/.]+$/, "");
 };
 
-exports.awsUrl = `https://dcays3srybill.cloudfront.net`;
+exports.awsUrl = `https://d2b1ol8c9bt133.cloudfront.net`;
 
 // Append AWS bucket name before the file path
 exports.appendBucketName = (url) => {
