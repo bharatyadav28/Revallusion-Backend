@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const PDFDocument = require("pdfkit");
 const JSZip = require("jszip");
+const XLSX = require("xlsx");
 
 const TransactionModel = require("./transaction.model");
 const {
@@ -497,4 +498,146 @@ exports.getUserTransactions = async (req, res) => {
       pagesCount,
     },
   });
+};
+
+exports.downloadAsCsv = async (req, res, next) => {
+  const { from, to } = req.query;
+  const query = { status: "Completed" };
+
+  if (from || to) {
+    query.createdAt = {};
+    if (from) query.createdAt.$gte = new Date(from);
+    if (to) {
+      const endOfDay = new Date(to);
+      // Includes whole day
+      endOfDay.setHours(23, 59, 59, 999);
+      query.createdAt.$lte = endOfDay;
+    }
+  }
+
+  const data = await TransactionModel.aggregate([
+    {
+      $match: query,
+    },
+    {
+      $lookup: {
+        from: "users",
+        let: {
+          userId: "$user",
+        },
+        pipeline: [
+          {
+            $match: { $expr: { $eq: ["$_id", "$$userId"] } },
+          },
+          {
+            $project: {
+              name: 1,
+              email: 1,
+              _id: 1,
+            },
+          },
+        ],
+        as: "user",
+      },
+    },
+    {
+      $unwind: "$user",
+    },
+    {
+      $lookup: {
+        from: "orders",
+        let: {
+          orderId: "$order",
+        },
+        pipeline: [
+          {
+            $match: { $expr: { $eq: ["$_id", "$$orderId"] } },
+          },
+          {
+            $lookup: {
+              from: "plans",
+              let: { planId: "$plan" },
+              pipeline: [
+                {
+                  $match: { $expr: { $eq: ["$_id", "$$planId"] } },
+                },
+                {
+                  $project: {
+                    plan_type: 1,
+                  },
+                },
+              ],
+              as: "plan",
+            },
+          },
+          {
+            $unwind: "$plan",
+          },
+          {
+            $project: {
+              plan: 1,
+            },
+          },
+
+          {
+            $project: {
+              plan: 1,
+            },
+          },
+        ],
+        as: "order",
+      },
+    },
+    {
+      $unwind: "$order",
+    },
+    {
+      $set: {
+        date: {
+          $dateToString: {
+            format: "%Y-%m-%d",
+            date: "$createdAt",
+            timezone: "Asia/Kolkata", // optional: adjust based on your timezone
+          },
+        },
+      },
+    },
+
+    {
+      $project: {
+        name: "$user.name",
+        email: "$user.email",
+        plan: "$order.plan.plan_type",
+        amount: 1,
+        gateway: 1,
+        payment_id: 1,
+        date: 1,
+        _id: 0,
+      },
+    },
+  ]);
+
+  // return res.status(200).json({ data });
+
+  // Convert data to worksheet
+  const worksheet = XLSX.utils.json_to_sheet(data);
+
+  // Create workbook and add the worksheet
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+
+  // Write the workbook to a buffer
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  // Set response headers
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", "attachment; filename=users.xlsx");
+
+  // Send the buffer as the response
+  // console.log(buffer)
+
+  res.status(200).send(buffer);
 };

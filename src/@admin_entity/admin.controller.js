@@ -223,7 +223,7 @@ exports.getUsers = async (req, res) => {
   let { search, currentPage, resultsPerPage, selectedPlan } = req.query;
 
   // Query for aggregation
-  let query = { isDeleted: false, role: "user" };
+  let query = { isDeleted: false, role: "user", isEmailVerified: true };
   search = search?.trim();
   if (search) {
     const searchRegExp = new RegExp(search, "i");
@@ -1023,6 +1023,7 @@ exports.deleteUser = async (req, res) => {
 exports.getDashBoardContent = async (req, res) => {
   const userPromise = userModel.countDocuments({
     isDeleted: false,
+    isEmailVerified: true,
     role: "user",
   });
 
