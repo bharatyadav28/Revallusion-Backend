@@ -20,9 +20,6 @@ const {
 const CourseModel = require("../@course_entity/course.model.js");
 const OrderModel = require("../@order_entity/order.model.js");
 const PlanModel = require("../@plan_entity/plan.model.js");
-const {
-  getVideoTimeStamps,
-} = require("../@timestamp_entity/timestamp.controller.js");
 
 // Get presigned url for upload video
 exports.getUploadURL = async (req, res, next) => {
@@ -218,8 +215,6 @@ exports.getVideo = async (req, res, next) => {
     })
     .lean();
 
-  // const timestampsPromise = getVideoTimeStamps(videoId);
-
   // Fetch user subscription
   const orderPromise = OrderModel.findOne({
     status: "Active",
@@ -265,7 +260,7 @@ exports.getVideo = async (req, res, next) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { video: filteredVideo, timestamps },
+    data: { video: filteredVideo },
     message: "Video fetch successfully",
   });
 };
