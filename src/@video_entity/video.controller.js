@@ -509,7 +509,7 @@ exports.deleteVideo = async (req, res, next) => {
           query.submodule = null;
         }
 
-        updateSequencePromise = VideoModel.updateMany(
+        updateSequencePromise = await VideoModel.updateMany(
           {
             ...query,
             sequence: { $gt: video.sequence },
@@ -519,7 +519,7 @@ exports.deleteVideo = async (req, res, next) => {
         );
       }
 
-      const softDeleteVideoPromise = VideoModel.updateOne(
+      const softDeleteVideoPromise = await VideoModel.updateOne(
         { _id: videoId },
         {
           $set: {
@@ -534,11 +534,11 @@ exports.deleteVideo = async (req, res, next) => {
         { session }
       );
 
-      const allPromises = [softDeleteVideoPromise];
-      if (updateSequencePromise) {
-        allPromises.push(updateSequencePromise);
-      }
-      await Promise.all(allPromises);
+      // const allPromises = [softDeleteVideoPromise];
+      // if (updateSequencePromise) {
+      //   allPromises.push(updateSequencePromise);
+      // }
+      // await Promise.all(allPromises);
     });
 
     await session.endSession();
