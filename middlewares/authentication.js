@@ -65,7 +65,7 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
 exports.auth = async (req, res, next) => {
   const { accessToken, refreshToken } = req.signedCookies;
 
-  if (!accessToken && !refreshToken) {
+  if (!accessToken) {
     throw new UnauthenticatedError("Session expired, please login again");
   }
 
@@ -80,14 +80,19 @@ exports.auth = async (req, res, next) => {
 
     attachUserToReq(req, existingUser);
 
-    const deviceId = generateDeviceId(req);
+    if (existingUser.role === "user") {
+      if (!refreshToken) {
+        throw new UnauthenticatedError("Session expired, please login again");
+      }
+      const deviceId = generateDeviceId(req);
 
-    // Validate session
-    await validateSession({
-      user: existingUser,
-      deviceId,
-      refreshToken,
-    });
+      // Validate session
+      await validateSession({
+        user: existingUser,
+        deviceId,
+        refreshToken,
+      });
+    }
 
     return next();
   } catch (accessError) {

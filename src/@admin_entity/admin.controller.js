@@ -25,6 +25,9 @@ const QueryModel = require("../@query_entity/query.model");
 const {
   sendInvoice,
 } = require("../@transaction_entity/transaction.controller");
+const { getTokenPayload } = require("../../utils/helperFuns");
+const { createAccessToken } = require("../../utils/jwt");
+const { attachAccessTokenToCookies } = require("../../utils/jwt");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -50,14 +53,20 @@ exports.adminSignin = async (req, res) => {
     throw new BadRequestError("Invalid Password");
   }
 
-  await updateSessionAndCreateTokens({
-    req,
-    res,
-    user,
-    deviceId: generateDeviceId(req),
-    ua: getDeviceData(req),
-    keepMeSignedIn: keepMeSignedIn || false,
-  });
+  const tokenPayoad = getTokenPayload(user);
+  const accessToken = createAccessToken(tokenPayoad, true);
+  console.log("Access token", accessToken);
+
+  attachAccessTokenToCookies({ res, accessToken, isAdmin: true });
+
+  // await updateSessionAndCreateTokens({
+  //   req,
+  //   res,
+  //   user,
+  //   deviceId: generateDeviceId(req),
+  //   ua: getDeviceData(req),
+  //   keepMeSignedIn: keepMeSignedIn || false,
+  // });
 
   const userData = filterUserData(user);
 

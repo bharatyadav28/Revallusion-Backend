@@ -17,9 +17,9 @@ const cookieConfig = {
 };
 
 // Create tokens
-exports.createAccessToken = (payload) => {
+exports.createAccessToken = (payload, isAdmin) => {
   const token = jwt.sign(payload, process.env.ACCESS_SECRET, {
-    expiresIn: minTime / 1000,
+    expiresIn: isAdmin ? maxTime : minTime / 1000,
   });
 
   return token;
@@ -77,10 +77,11 @@ exports.attachCookiesToResponse = ({
 };
 
 // Add access token to cookies(incase access token is invalid but refresh token is valid )
-exports.attachAccessTokenToCookies = ({ res, accessToken }) => {
+exports.attachAccessTokenToCookies = ({ res, accessToken, isAdmin }) => {
+  console.log("Hi", res);
   res.cookie("accessToken", accessToken, {
     ...cookieConfig,
-    expires: new Date(Date.now() + minTime),
+    expires: new Date(Date.now() + (isAdmin ? maxTime : minTime)),
   });
 };
 
