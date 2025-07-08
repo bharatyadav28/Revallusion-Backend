@@ -19,7 +19,7 @@ const cookieConfig = {
 // Create tokens
 exports.createAccessToken = (payload, isAdmin) => {
   const token = jwt.sign(payload, process.env.ACCESS_SECRET, {
-    expiresIn: isAdmin ? maxTime : minTime / 1000,
+    expiresIn: (isAdmin ? maxTime : minTime) / 1000,
   });
 
   return token;

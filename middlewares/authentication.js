@@ -66,6 +66,7 @@ exports.auth = async (req, res, next) => {
   const { accessToken, refreshToken } = req.signedCookies;
 
   if (!accessToken) {
+    console.log("First instance");
     throw new UnauthenticatedError("Session expired, please login again");
   }
 
@@ -82,6 +83,8 @@ exports.auth = async (req, res, next) => {
 
     if (existingUser.role === "user") {
       if (!refreshToken) {
+        console.log("Second instance");
+
         throw new UnauthenticatedError("Session expired, please login again");
       }
       const deviceId = generateDeviceId(req);
@@ -113,6 +116,8 @@ exports.auth = async (req, res, next) => {
         // Clear cookies (invalid access and refresh token)
         res.clearCookie("accessToken");
         res.clearCookie("refreshToken");
+        console.log("Third instance");
+
         throw new UnauthenticatedError("Session expired, please login again");
       }
     } else {

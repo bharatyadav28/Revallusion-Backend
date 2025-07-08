@@ -15,6 +15,7 @@ const {
   deleteUser,
   sendMeAdmin,
   getDashBoardContent,
+  restoreUser,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 
@@ -46,6 +47,7 @@ router
   .get(auth, isAdmin, userDetails)
   .put(auth, isAdmin, updateUser)
   .delete(auth, isAdmin, deleteUser);
+router.route("/users/:id/restore").put(auth, isAdmin, restoreUser);
 
 router.route("/dashboard").get(auth, isAdmin, getDashBoardContent);
 

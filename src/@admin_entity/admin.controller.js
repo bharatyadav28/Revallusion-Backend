@@ -229,10 +229,15 @@ exports.staffSignin = async (req, res) => {
 };
 
 exports.getUsers = async (req, res) => {
-  let { search, currentPage, resultsPerPage, selectedPlan } = req.query;
+  let { search, currentPage, resultsPerPage, selectedPlan, isDeleted } =
+    req.query;
 
   // Query for aggregation
-  let query = { isDeleted: false, role: "user", isEmailVerified: true };
+  let query = {
+    isDeleted: isDeleted === "yes" ? true : false,
+    role: "user",
+    isEmailVerified: true,
+  };
   search = search?.trim();
   if (search) {
     const searchRegExp = new RegExp(search, "i");
@@ -1154,5 +1159,35 @@ exports.getDashBoardContent = async (req, res) => {
       queries,
       revenues: revenues?.[0],
     },
+  });
+};
+
+exports.restoreUser = async (req, res) => {
+  const id = req.params.id;
+
+  const deletedUser = await userModel.findById(id);
+  if (!deletedUser) {
+    throw new NotFoundError("No such user exists");
+  }
+  if (!deletedUser.isDeleted) {
+    throw new BadRequestError("User is already active");
+  }
+
+  const existingUser = await userModel.findOne({
+    email: deletedUser.email,
+    isDeleted: false,
+  });
+  if (existingUser) {
+    throw new BadRequestError(
+      "This user already have an active account. Please delete that one to restore this one"
+    );
+  }
+
+  deletedUser.isDeleted = false;
+  deletedUser.deletedAt = null;
+  await deletedUser.save();
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "User deleted successfully",
   });
 };
