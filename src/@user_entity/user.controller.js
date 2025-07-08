@@ -228,6 +228,7 @@ exports.updateSessionAndCreateTokens = async ({
   ua,
   keepMeSignedIn = false,
 }) => {
+  user = await userModel.findById(user._id);
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
   const refreshToken = createRefreshToken(tokenPayoad, keepMeSignedIn);
