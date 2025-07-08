@@ -153,25 +153,25 @@ const activateSubscription = async ({
     throw new BadRequestError("Payment verification failed");
   }
 
-  const session = await mongoose.startSession();
-  session.startTransaction();
+  // const session = await mongoose.startSession();
+  // session.startTransaction();
 
   try {
     // Expire previous active order
     await OrderModel.findOneAndUpdate(
       { user: order.user, status: "Active" },
       { $set: { status: "Expire" } },
-      { new: true, runValidators: true, session }
+      { new: true, runValidators: true }
     );
 
     // Make current transaction comolete
     transaction.status = "Completed";
-    const saveTransactionPromise = transaction.save({ session });
+    const saveTransactionPromise = transaction.save();
 
     // Make current order active
     order.status = "Active";
     if (razorpay_signature) order.razorpay_signature = razorpay_signature;
-    const saveOrderPromise = order.save({ session });
+    const saveOrderPromise = order.save();
 
     await Promise.all([saveTransactionPromise, saveOrderPromise]);
 
@@ -184,15 +184,15 @@ const activateSubscription = async ({
 
     const result = await s3Uploadv4(data, "invoices", "invoice");
     transaction.invoice_url = result?.Key;
-    await transaction.save({ session });
+    await transaction.save();
 
     // Commit the transaction
-    await session.commitTransaction();
+    // await session.commitTransaction();
   } catch (error) {
-    await session.abortTransaction();
+    // await session.abortTransaction();
     throw error;
   } finally {
-    session.endSession();
+    // session.endSession();
   }
 };
 
