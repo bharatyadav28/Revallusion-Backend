@@ -114,15 +114,15 @@ exports.auth = async (req, res, next) => {
         console.log("!!! Error in refresh token: ", refreshError.message);
 
         // Clear cookies (invalid access and refresh token)
-        res.clearCookie("accessToken");
-        res.clearCookie("refreshToken");
+        // res.clearCookie("accessToken");
+        // res.clearCookie("refreshToken");
         console.log("Third instance");
 
         throw new UnauthenticatedError("Session expired, please login again");
       }
     } else {
-      res.clearCookie("accessToken");
-      res.clearCookie("refreshToken");
+      // res.clearCookie("accessToken");
+      // res.clearCookie("refreshToken");
       throw new UnauthenticatedError(
         accessError.message || "Not authorized to access this route"
       );

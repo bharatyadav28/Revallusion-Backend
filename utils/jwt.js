@@ -78,7 +78,6 @@ exports.attachCookiesToResponse = ({
 
 // Add access token to cookies(incase access token is invalid but refresh token is valid )
 exports.attachAccessTokenToCookies = ({ res, accessToken, isAdmin }) => {
-  console.log("Hi", res);
   res.cookie("accessToken", accessToken, {
     ...cookieConfig,
     expires: new Date(Date.now() + (isAdmin ? maxTime : minTime)),
