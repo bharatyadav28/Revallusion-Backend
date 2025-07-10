@@ -32,7 +32,7 @@ app.use(
       "https://www.ravallusion.com",
       "https://ravallusion.com",
       "https://ravallusion-frontend.vercel.app",
-      "https://admin.ravallusion.com/",
+      "https://admin.ravallusion.com",
     ],
     methods: ["GET", "POST", "DELETE", "UPDATE", "PUT", "PATCH"],
     credentials: true,
