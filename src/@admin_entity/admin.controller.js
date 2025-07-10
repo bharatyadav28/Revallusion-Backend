@@ -55,7 +55,6 @@ exports.adminSignin = async (req, res) => {
 
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad, true);
-  console.log("Access token", accessToken);
 
   attachAccessTokenToCookies({ res, accessToken, isAdmin: true });
 
@@ -842,7 +841,6 @@ exports.updateUser = async (req, res) => {
     throw new BadRequestError("Targeted plan doesnot exist");
 
   const body = { email };
-  console.log("Mobile, ", mobile);
   if (name) body.name = name;
   if (mobile) {
     let formattedMobile = mobile;
@@ -902,8 +900,6 @@ exports.updateUser = async (req, res) => {
         });
 
         await newOrder.save({ session });
-
-        console.log("Payment id", newOrder, amount);
 
         const newTransaction = new TransactionModel({
           order: newOrder?._id,

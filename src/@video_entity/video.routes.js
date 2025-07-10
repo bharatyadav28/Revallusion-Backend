@@ -18,7 +18,11 @@ const {
   completeMultipartUpload,
   abortMultipartUpload,
   searchVideos,
+  start_upload,
+  uploads,
+  complete_upload,
 } = require("./video.controller.js");
+const { upload } = require("../../utils/s3.js");
 
 const router = express.Router();
 
@@ -51,5 +55,9 @@ router.route("/uploads/initiate").post(auth, isAdmin, initiateMultipartUpload);
 router.route("/uploads/generate-urls").post(auth, isAdmin, getUploadParts);
 router.route("/uploads/complete").post(auth, isAdmin, completeMultipartUpload);
 router.route("/uploads/abort").post(auth, isAdmin, abortMultipartUpload);
+
+router.post("/stream/start-upload", auth, isAdmin, start_upload);
+router.post("/stream/upload", auth, isAdmin, upload.single("file"), uploads);
+router.post("/stream/complete-upload", auth, isAdmin, complete_upload);
 
 module.exports = router;

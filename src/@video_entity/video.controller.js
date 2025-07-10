@@ -283,11 +283,6 @@ exports.saveVideo = async (req, res, next) => {
     throw new BadRequestError("Please enter all required fields");
   }
 
-  // videoUrl = decodeURIComponent(videoUrl);
-  // console.log("Video Url", videoUrl);
-
-  // // Extract keys from url
-  // if (videoUrl) videoUrl = extractVideoURLKey(videoUrl);
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
   if (assignment) assignment = extractURLKey(assignment);
 
@@ -854,6 +849,86 @@ exports.abortMultipartUpload = async (req, res) => {
     success: true,
     message: "Upload aborted successfully",
   });
+};
+
+// Streaming
+
+exports.start_upload = async (req, res) => {
+  const { fileType, contentType } = req.body;
+  const fileName = generateUniqueId();
+  let key = `${fileType ? "assignments" : "admin-uploads"}/${fileName}`;
+
+  try {
+    let params = {
+      // Bucket: process.env.AWS_VIDEO_BUCKET_NAME,
+      Bucket: fileType
+        ? process.env.AWS_BUCKET_NAME
+        : process.env.AWS_VIDEO_BUCKET_NAME,
+      Key: key,
+    };
+    if (contentType) {
+      params = { ...params, ContentType: contentType };
+    }
+
+    const data = await s3.createMultipartUpload(params).promise();
+    data.fileName = key.replaceAll(" ", "");
+    // console.log("Start upload", data);
+    res.status(StatusCodes.OK).json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.uploads = async (req, res) => {
+  const { buffer } = req.file;
+
+  const uploadId = req.body.uploadId;
+  const partNumber = parseInt(req.body.partNumber, 10);
+
+  const fileName = req.body.fileName;
+  const fileType = req.body.fileType;
+  const key = fileName.replaceAll(" ", "");
+
+  try {
+    const params = {
+      Bucket: fileType
+        ? process.env.AWS_BUCKET_NAME
+        : process.env.AWS_VIDEO_BUCKET_NAME,
+      Key: key,
+      Body: buffer,
+      PartNumber: partNumber,
+      UploadId: uploadId,
+    };
+
+    const data = await s3.uploadPart(params).promise();
+    data.fileName = key.replaceAll(" ", "");
+    res.status(200).json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.complete_upload = async (req, res) => {
+  const { uploadId, fileName, parts, fileType } = req.body;
+
+  try {
+    const params = {
+      Bucket: fileType
+        ? process.env.AWS_BUCKET_NAME
+        : process.env.AWS_VIDEO_BUCKET_NAME,
+      Key: fileName.replaceAll(" ", ""),
+      MultipartUpload: { Parts: parts },
+      UploadId: uploadId,
+    };
+
+    const data = await s3.completeMultipartUpload(params).promise();
+    res.status(200).json(data);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: error.message });
+  }
 };
 
 exports.searchVideos = async (req, res) => {
