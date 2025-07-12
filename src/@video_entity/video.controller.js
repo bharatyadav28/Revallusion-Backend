@@ -133,7 +133,7 @@ exports.getIntroductoryVideos = async (req, res) => {
           {
             $match: {
               isDeleted: false,
-              // isActive: true,
+              isActive: true,
             },
           },
           {
@@ -156,6 +156,7 @@ exports.getIntroductoryVideos = async (req, res) => {
               thumbnailUrl: 1,
               duration: 1,
               sequence: 1,
+              // isActive: 1,
             },
           },
         ],
@@ -854,8 +855,11 @@ exports.abortMultipartUpload = async (req, res) => {
 // Streaming
 
 exports.start_upload = async (req, res) => {
-  const { fileType, contentType } = req.body;
-  const fileName = generateUniqueId();
+  const { fileType, contentType, awsFileName } = req.body;
+  let fileName = generateUniqueId();
+  if (awsFileName) {
+    fileName += "/" + awsFileName.split(" ").join("_");
+  }
   let key = `${fileType ? "assignments" : "admin-uploads"}/${fileName}`;
 
   try {
