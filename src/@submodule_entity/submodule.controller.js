@@ -17,12 +17,12 @@ exports.addSubModule = async (req, res) => {
   const { moduleId, name, thumbnailUrl } = req.body;
   let { resource } = req.body;
 
-  if (!name) throw new BadRequestError("Please enter submodule name");
+  if (!name) throw new BadRequestError("Please enter topic name");
 
   const module = await CourseModuleModel.findOne({
     _id: moduleId,
   });
-  if (!module) throw new NotFoundError("Requested module may not exists");
+  if (!module) throw new NotFoundError("Requested tool may not exists");
 
   // Get sequence number for new submodue
   const sequence = await SubmoduleModel.getNextSequence(moduleId);
@@ -40,19 +40,19 @@ exports.addSubModule = async (req, res) => {
   });
 
   if (!submodule) {
-    throw new BadRequestError("Failed to add submodule");
+    throw new BadRequestError("Failed to add topic");
   }
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Submodule added successfully",
+    message: "Topic added successfully",
   });
 };
 
 // Update a submodule present in a module
 exports.updateSubModule = async (req, res) => {
   let { name, thumbnailUrl, newModuleId, sequence, resource } = req.body;
-  if (!name) throw new BadRequestError("Please enter submodule name");
+  if (!name) throw new BadRequestError("Please enter topic name");
 
   const { id: submoduleId } = req.params;
 
@@ -60,7 +60,7 @@ exports.updateSubModule = async (req, res) => {
   // if (!module) throw new NotFoundError("Requested module may not exists");
 
   const submodule = await SubmoduleModel.findById(submoduleId);
-  if (!submodule) throw new NotFoundError("Requested submodule may not exists");
+  if (!submodule) throw new NotFoundError("Requested topic may not exists");
 
   if (name) submodule.name = name;
   if (thumbnailUrl) {
@@ -189,7 +189,7 @@ exports.updateSubModule = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Submodule updated successfully",
+    message: "Topic updated successfully",
 
     submodule: submodule,
   });
@@ -201,7 +201,7 @@ exports.deleteSubModule = async (req, res) => {
 
   const targetSubmodule = await SubmoduleModel.findById(submoduleId);
   if (!targetSubmodule) {
-    throw new NotFoundError("Targeted submodule may not exists");
+    throw new NotFoundError("Targeted topic may not exists");
   }
 
   const module = targetSubmodule.module;
@@ -209,7 +209,7 @@ exports.deleteSubModule = async (req, res) => {
 
   try {
     await session.withTransaction(async () => {
-      const updateSubmoduleVideosPromise = VideoModel.updateMany(
+      await VideoModel.updateMany(
         {
           submodule: submoduleId,
         },
@@ -223,7 +223,7 @@ exports.deleteSubModule = async (req, res) => {
       );
 
       // Decrement sequence of all submodules having greater sequence than submodule being deleted
-      const adjustSubmodulesSequencePromise = SubmoduleModel.updateMany(
+      await SubmoduleModel.updateMany(
         {
           module,
           sequence: { $gt: targetSubmodule.sequence },
@@ -237,13 +237,7 @@ exports.deleteSubModule = async (req, res) => {
         }
       );
 
-      const deleteSubmodulePromise = targetSubmodule.deleteOne({ session });
-
-      await Promise.all([
-        updateSubmoduleVideosPromise,
-        adjustSubmodulesSequencePromise,
-        deleteSubmodulePromise,
-      ]);
+      await targetSubmodule.deleteOne({ session });
     });
 
     await session.endSession();
@@ -254,6 +248,6 @@ exports.deleteSubModule = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Submodule deleted successfully",
+    message: "Topic deleted successfully",
   });
 };

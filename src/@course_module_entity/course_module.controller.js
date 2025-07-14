@@ -2,15 +2,18 @@ const { StatusCodes } = require("http-status-codes");
 
 const CourseModel = require("../@course_entity/course.model.js");
 const CourseModuleModel = require("./course_module.model.js");
+const VideoModel = require("../@video_entity/video.model.js");
 const { NotFoundError, BadRequestError } = require("../../errors/index.js");
 const { extractURLKey } = require("../../utils/helperFuns.js");
+const { default: mongoose } = require("mongoose");
+const SubmoduleModel = require("../@submodule_entity/submodule.model.js");
 
 // Add new module in a course
 exports.addModule = async (req, res) => {
   const { courseId, name, thumbnailUrl } = req.body;
 
   if (!name) {
-    throw new BadRequestError("Please enter module name");
+    throw new BadRequestError("Please enter tool name");
   }
 
   const course = await CourseModel.findOne({
@@ -32,7 +35,7 @@ exports.addModule = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Module added successfully",
+    message: "Tool added successfully",
     data: course,
   });
 };
@@ -60,6 +63,81 @@ exports.updateModuleName = async (req, res) => {
 
   res.status(StatusCodes.OK).json({
     success: true,
-    message: "Module name updated successfully",
+    message: "Tool name updated successfully",
+  });
+};
+
+exports.deleteModule = async (req, res) => {
+  const id = req.params.id;
+  const submodules = await SubmoduleModel.aggregate([
+    {
+      $match: {
+        module: new mongoose.Types.ObjectId(id),
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        module: 1,
+        sequence: 1,
+      },
+    },
+  ]);
+
+  console.log("submodules", submodules);
+
+  for (const submodule of submodules) {
+    const module = submodule.module;
+    const submoduleId = submodule._id;
+    const session = await mongoose.startSession();
+
+    try {
+      await session.withTransaction(async () => {
+        await VideoModel.updateMany(
+          {
+            submodule: submoduleId,
+          },
+          {
+            $set: { course: null, module: null, submodule: null },
+          },
+          {
+            session,
+            // runValidators: true,
+          }
+        );
+
+        // Decrement sequence of all submodules having greater sequence than submodule being deleted
+        await SubmoduleModel.updateMany(
+          {
+            module,
+            sequence: { $gt: submodule.sequence },
+          },
+          {
+            $inc: { sequence: -1 },
+          },
+          {
+            // runValidators: true,
+            session,
+          }
+        );
+
+        await SubmoduleModel.deleteOne({
+          _id: submoduleId,
+        });
+      });
+
+      await session.endSession();
+    } catch (error) {
+      await session.endSession();
+      throw error;
+    }
+  }
+  await CourseModuleModel.deleteOne({
+    _id: id,
+  });
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Tool deleted successfully",
   });
 };

@@ -3,18 +3,18 @@ const mongoose = require("mongoose");
 const SubmoduleSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: [true, "Please enter sub-module name"],
+    required: [true, "Please enter topic name"],
     trim: true,
   },
   module: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Module",
+    ref: "CourseModule",
     required: true,
   },
   thumbnailUrl: String,
   sequence: {
     type: Number,
-    required: [true, "Please enter sub-module sequence"],
+    required: [true, "Please enter topic sequence"],
   },
   resource: {
     type: String,

@@ -4,7 +4,7 @@ const ModuleSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Please enter module name"],
+      required: [true, "Please enter tool name"],
       trim: true,
     },
     thumbnailUrl: String,
