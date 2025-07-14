@@ -16,11 +16,41 @@ exports.getDashboardContent = async (req, res) => {
         localField: "videos.video",
         foreignField: "_id",
         pipeline: [
+          // {
+          //   $match: {
+          //     isDeleted: false,
+          //   },
+          // },
           {
-            $match: {
-              isDeleted: false,
+            $lookup: {
+              from: "courses",
+              let: {
+                courseId: "$course",
+              },
+              pipeline: [
+                {
+                  $match: { $expr: { $eq: ["$_id", "$$courseId"] } },
+                },
+
+                {
+                  $project: {
+                    level: 1,
+                    _id: 0,
+                  },
+                },
+              ],
+              as: "course",
             },
           },
+
+          {
+            $addFields: {
+              level: {
+                $ifNull: [{ $arrayElemAt: ["$course.level", 0] }, -1],
+              },
+            },
+          },
+
           {
             $addFields: {
               thumbnailUrl: {
@@ -34,6 +64,7 @@ exports.getDashboardContent = async (req, res) => {
               description: 1,
               duration: 1,
               thumbnailUrl: 1,
+              level: 1,
             },
           },
         ],

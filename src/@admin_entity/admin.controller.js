@@ -763,7 +763,7 @@ exports.createUser = async (req, res) => {
   if (plan && !existingPlan)
     throw new BadRequestError("Targeted plan doesnot exist");
 
-  const body = { email };
+  const body = { email, isEmailVerified: true };
   if (mobile) body.mobile = mobile.length > 10 ? mobile : "+91" + mobile;
   if (plan) body.plan = plan;
   if (name) body.name = name;
@@ -1184,6 +1184,6 @@ exports.restoreUser = async (req, res) => {
   await deletedUser.save();
   return res.status(StatusCodes.OK).json({
     success: true,
-    message: "User deleted successfully",
+    message: "User restored successfully",
   });
 };

@@ -46,6 +46,36 @@ exports.getDashboardCarousals = async (req, res) => {
           //   },
           // },
           {
+            $lookup: {
+              from: "courses",
+              let: {
+                courseId: "$course",
+              },
+              pipeline: [
+                {
+                  $match: { $expr: { $eq: ["$_id", "$$courseId"] } },
+                },
+
+                {
+                  $project: {
+                    level: 1,
+                    _id: 0,
+                  },
+                },
+              ],
+              as: "course",
+            },
+          },
+
+          {
+            $addFields: {
+              level: {
+                $ifNull: [{ $arrayElemAt: ["$course.level", 0] }, -1],
+              },
+            },
+          },
+
+          {
             $addFields: {
               thumbnailUrl: {
                 $concat: [awsUrl, "/", "$thumbnailUrl"],
@@ -58,6 +88,7 @@ exports.getDashboardCarousals = async (req, res) => {
               title: 1,
               description: 1,
               thumbnailUrl: 1,
+              level: 1,
             },
           },
         ],

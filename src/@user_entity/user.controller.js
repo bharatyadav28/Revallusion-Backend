@@ -389,15 +389,39 @@ exports.updateAvatar = async (req, res) => {
   );
 
   if (!user) {
+    throw new BadRequestError("Profile pic updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Profile pic updated successfully",
+    data: {
+      avatar: appendBucketName(result.key),
+    },
+  });
+};
+
+exports.removeAvatar = async (req, res) => {
+  const userId = req.user._id;
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      avatar: "",
+    },
+    {
+      runValidators: true,
+      new: true,
+    }
+  );
+
+  if (!user) {
     throw new BadRequestError("Profile image updation failed");
   }
 
   return res.status(StatusCodes.OK).json({
     success: true,
-    message: "Avatar updated successfully",
-    data: {
-      avatar: appendBucketName(result.key),
-    },
+    message: "Profile pic removed successfully",
   });
 };
 

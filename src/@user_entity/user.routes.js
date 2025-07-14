@@ -9,6 +9,7 @@ const {
   googleAuth,
   sendMe,
   updateAvatar,
+  removeAvatar,
   updateMobile,
   updateName,
   deleteAccount,
@@ -27,7 +28,10 @@ router.route("/google-auth").post(googleAuth);
 router.route("/send-me").get(auth, sendMe);
 router.route("/logout").delete(auth, logout);
 
-router.route("/avatar").put(auth, upload.single("file"), updateAvatar);
+router
+  .route("/avatar")
+  .put(auth, upload.single("file"), updateAvatar)
+  .delete(auth, removeAvatar);
 router.route("/name").put(auth, updateName);
 router.route("/mobile").put(auth, updateMobile);
 router.route("/address").put(auth, updateAddress);

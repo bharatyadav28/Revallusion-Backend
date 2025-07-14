@@ -11,6 +11,11 @@ const CourseSchema = new mongoose.Schema(
       required: [true, "Please provide course title"],
       trim: true,
     },
+    level: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
     isFree: {
       type: Boolean,
       default: false,
