@@ -15,13 +15,14 @@ const {
 // Check if the session is valid
 const validateSession = async ({
   user,
-  deviceId,
+  ip,
+  os,
   refreshToken,
   browser = "postman",
 }) => {
   const isValidToken = user.activeSessions.refreshTokens.includes(refreshToken);
 
-  console.log("Valid token", isValidToken);
+  console.log("Valid refresh token", isValidToken);
 
   if (!isValidToken) {
     throw new UnauthenticatedError("Invalid session");
@@ -29,18 +30,30 @@ const validateSession = async ({
 
   console.log(
     "Auth validate",
-    user.activeSessions.ipAddress !== deviceId,
+    user.activeSessions.ip !== ip,
     user.activeSessions.primaryBrowser === browser,
     browser,
-    deviceId,
-    user.activeSessions.ipAddress
+    ip,
+    os,
+    user.activeSessions.ip
   );
-  if (user.activeSessions.ipAddress !== deviceId)
-    if (user.activeSessions.primaryBrowser === browser) {
-      user.activeSessions.ipAddress = deviceId;
+  if (user.activeSessions.ip !== ip)
+    if (
+      user.activeSessions.primaryBrowser === browser &&
+      user.activeSessions.os === os
+    ) {
+      user.activeSessions.ip = ip;
+      user.activeSessions.os = os;
+
       await user.save();
     } else {
-      throw new UnauthenticatedError("Invalid session");
+      user.activeSessions.refreshTokens =
+        user.activeSessions.refreshTokens?.filter(
+          (token) => token === refreshToken
+        );
+
+      await user.save();
+      throw new Error("Invalid session");
     }
 };
 
@@ -52,7 +65,7 @@ const attachUserToReq = (req, user) => {
 
 // Generate new access token using if refresh token is valid
 const handleTokenRefresh = async ({ req, res, refreshToken }) => {
-  console.log("token refresh");
+  console.log("token refresh(new access token)");
   const refreshTokenPayload = verify_token({
     token: refreshToken,
     type: "refresh",
@@ -64,7 +77,8 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
   // Validate session
   await validateSession({
     user: existingUser,
-    deviceId: req.ip,
+    ip: req.ip,
+    os: ua.os.name,
     refreshToken,
     browser: ua.browser.name,
   });
@@ -81,11 +95,12 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
 
 // Authentication middleware
 exports.auth = async (req, res, next) => {
+  console.log("Authentication middleware");
   const { accessToken, refreshToken } = req.signedCookies;
 
   try {
     if (!accessToken) {
-      console.log("First instance");
+      console.log("NO access token");
       throw new UnauthenticatedError("Session expired, please login again");
     }
 
@@ -109,7 +124,8 @@ exports.auth = async (req, res, next) => {
       // Validate session
       await validateSession({
         user: existingUser,
-        deviceId: req.ip,
+        ip: req.ip,
+        os: ua.os.name,
         refreshToken,
         browser: ua.browser.name,
       });
@@ -118,14 +134,12 @@ exports.auth = async (req, res, next) => {
     return next();
   } catch (accessError) {
     console.log("!!! Error in access token: ", accessError.message);
-    console.log("Hello");
 
     // Check for refresh token validation
     if (
       refreshToken &&
       (accessError.name === "TokenExpiredError" || !accessToken)
     ) {
-      console.log("Ji");
       try {
         await handleTokenRefresh({ req, res, refreshToken });
 
@@ -136,7 +150,6 @@ exports.auth = async (req, res, next) => {
         // Clear cookies (invalid access and refresh token)
         // res.clearCookie("accessToken");
         res.clearCookie("refreshToken");
-        console.log("Third instance");
 
         throw new UnauthenticatedError("Session expired, please login again");
       }

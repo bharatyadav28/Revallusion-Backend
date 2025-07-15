@@ -3,16 +3,28 @@ const validator = require("validator");
 const bcrypt = require("bcrypt");
 
 const activeSessionSchema = new mongoose.Schema({
-  ipAddress: {
+  ip: {
     type: String,
     trim: true,
     required: [true, "Please provide device's ip address"],
+  },
+  os: {
+    type: String,
+    trim: true,
+    required: [true, "Please provide os name"],
   },
   primaryBrowser: {
     type: String,
     trim: true,
     required: [true, "Please provide browser name"],
   },
+
+  primaryBrowser: {
+    type: String,
+    trim: true,
+    required: [true, "Please provide os"],
+  },
+
   refreshTokens: [String],
 });
 

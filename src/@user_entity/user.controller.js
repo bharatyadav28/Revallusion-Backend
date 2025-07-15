@@ -177,13 +177,12 @@ exports.googleAuth = async (req, res) => {
   const ua = getDeviceData(req);
 
   // Check if user is already logged in on a different device
-  detectMultipleSessions({ res, user, currentDeviceId: deviceId });
+  detectMultipleSessions({ res, user, ip: req.ip, os: ua.os.name });
 
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
-    deviceId,
     ua,
   });
 
@@ -197,19 +196,22 @@ exports.googleAuth = async (req, res) => {
 };
 
 // Helper function to check if user is already logged in on a different device
-const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
-  if (!user?.activeSessions?.ipAddress) {
+const detectMultipleSessions = ({ res, user, ip, os }) => {
+  if (!user?.activeSessions?.ip) {
     return;
   }
 
   const otherDeviceSession = !(
-    String(user?.activeSessions?.ipAddress) === String(currentDeviceId)
+    String(user?.activeSessions?.ip) === String(ip) &&
+    String(user?.activeSessions?.os) === String(os)
   );
   console.log(
-    "otherDeviceSession",
+    "Detect multiple session",
     otherDeviceSession,
-    user?.activeSessions?.ipAddress,
-    currentDeviceId
+    user?.activeSessions?.ip,
+    ip,
+    user?.activeSessions?.os,
+    os
   );
 
   if (otherDeviceSession) {
@@ -226,32 +228,33 @@ exports.updateSessionAndCreateTokens = async ({
   req,
   res,
   user,
-  deviceId,
   ua,
   keepMeSignedIn = false,
   isNewDevice = false,
 }) => {
+  console.log("updateSessionAndCreateTokens");
   user = await userModel.findById(user._id);
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
   const refreshToken = createRefreshToken(tokenPayoad, keepMeSignedIn);
   const activeSessions = user?.activeSessions || {};
-  console.log("user", user);
 
   const savedRefreshTokens = activeSessions?.refreshTokens;
 
-  activeSessions.ipAddress = req.ip;
-  activeSessions.refreshTokens = savedRefreshTokens
-    ? [...savedRefreshTokens, refreshToken]
-    : [refreshToken];
+  activeSessions.ip = req.ip;
+  activeSessions.os = ua.os.name;
 
   if (isNewDevice || !activeSessions?.primaryBrowser) {
-    console.log("Yes");
+    console.log("Is new device");
     activeSessions.primaryBrowser = ua?.browser?.name || "postman";
+    activeSessions.refreshTokens = [refreshToken];
+  } else {
+    activeSessions.refreshTokens = savedRefreshTokens
+      ? [...savedRefreshTokens, refreshToken]
+      : [refreshToken];
   }
 
-  console.log("sessionInfo", activeSessions);
-
+  console.log("Active sessons", activeSessions);
   user.activeSessions = activeSessions;
 
   await user.save();
@@ -275,20 +278,21 @@ exports.verifyUser = async (req, res) => {
 
   let query = { otp, type, userId, email };
   await OTPManager.verifyOTP(query);
-  if (type === "account_verification") user.isEmailVerified = true;
+  if (type === "account_verification") {
+    user.isEmailVerified = true;
+    await user.save();
+  }
 
-  const deviceId = generateDeviceId(req);
   const ua = getDeviceData(req);
-  console.log("UA", ua);
+  console.log(" Signin UA", ua);
 
   // Check if user is already logged in on a different device
-  detectMultipleSessions({ res, user, currentDeviceId: req.ip });
+  detectMultipleSessions({ res, user, ip: req.ip, os: ua.os.name });
 
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
-    deviceId,
     ua,
     keepMeSignedIn,
   });
@@ -308,17 +312,13 @@ exports.switchDevice = async (req, res) => {
 
   const existingUser = await getExistingUser(payload.user._id);
 
-  existingUser.activeSessions = [];
-  await existingUser.save();
-
-  const deviceId = generateDeviceId(req);
   const ua = getDeviceData(req);
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user: existingUser,
-    deviceId,
     ua,
+    isNewDevice: true,
   });
 
   res.clearCookie("tempToken");
@@ -341,13 +341,10 @@ exports.logout = async (req, res) => {
   }
 
   // Remove current ssession from user model
-  user.activeSessions = user.activeSessions?.filter(
-    (session) =>
-      !(
-        session.refreshToken === refreshToken &&
-        session.deviceInfo.deviceId === deviceId
-      )
-  );
+  user.activeSessions.refreshTokens =
+    user.activeSessions?.refreshTokens?.filter(
+      (token) => token !== refreshToken
+    );
   await user.save();
 
   // clear token cookies

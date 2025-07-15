@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 
-const minTime = 1000 * 60 * 60 * 24;
-// const minTime = 1000 * 10;
+// const minTime = 1000 * 60 * 60 * 24;
+const minTime = 1000 * 10;
 
 const maxTime = 1000 * 60 * 60 * 24 * 7;
 // const maxTime = 1000 * 10;
