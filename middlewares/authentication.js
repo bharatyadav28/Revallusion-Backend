@@ -28,6 +28,7 @@ const validateSession = async ({
   }
 
   console.log(
+    "Auth validate",
     user.activeSessions.ipAddress !== deviceId,
     user.activeSessions.primaryBrowser === browser,
     browser,
@@ -134,14 +135,14 @@ exports.auth = async (req, res, next) => {
 
         // Clear cookies (invalid access and refresh token)
         // res.clearCookie("accessToken");
-        // res.clearCookie("refreshToken");
+        res.clearCookie("refreshToken");
         console.log("Third instance");
 
         throw new UnauthenticatedError("Session expired, please login again");
       }
     } else {
       // res.clearCookie("accessToken");
-      // res.clearCookie("refreshToken");
+      res.clearCookie("refreshToken");
       throw new UnauthenticatedError(
         accessError.message || "Not authorized to access this route"
       );

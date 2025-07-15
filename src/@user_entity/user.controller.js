@@ -202,8 +202,9 @@ const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
     return;
   }
 
-  const otherDeviceSession =
-    !user?.activeSessions?.ipAddress === currentDeviceId;
+  const otherDeviceSession = !(
+    String(user?.activeSessions?.ipAddress) === String(currentDeviceId)
+  );
   console.log(
     "otherDeviceSession",
     otherDeviceSession,
