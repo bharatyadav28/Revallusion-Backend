@@ -234,7 +234,7 @@ exports.updateSessionAndCreateTokens = async ({
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
   const refreshToken = createRefreshToken(tokenPayoad, keepMeSignedIn);
-  const activeSessions = user?.activeSessions;
+  const activeSessions = user?.activeSessions || {};
   console.log("user", user);
 
   const savedRefreshTokens = activeSessions?.refreshTokens;
