@@ -467,6 +467,7 @@ exports.subscribedCourseAssignments = async (req, res) => {
         course: {
           $in: coveredCourseIds,
         },
+        isDeleted: false,
       },
     },
     {
@@ -702,7 +703,7 @@ exports.getUserAssignments = async (req, res) => {
 
   return res.status(200).json({
     success: true,
-    message: "Submitted assigments fetched successfully",
+    message: "Submitted assignments fetched successfully",
     data: {
       assigments,
       totalAssignments,

@@ -17,6 +17,7 @@ const userModel = require("../@user_entity/user.model.js");
 const {
   formatDateTime,
   appendBucketName,
+  certificateAvailableEmail,
 } = require("../../utils/helperFuns.js");
 
 // Test
@@ -315,6 +316,14 @@ exports.saveUserProgress = async (userId) => {
           completionTime,
         });
       }
+
+      const user = await userModel.findById(userId);
+      if (user) {
+        await certificateAvailableEmail({
+          name: user?.name || userId,
+          email: user.email,
+        });
+      }
     }
   }
 };
@@ -396,10 +405,20 @@ const createCertificateBuffer = async ({
               },
             ];
 
+            const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
+      <h2 style="color: #2e86de;">🎓 Congratulations, ${name}!</h2>
+      <p style="font-size: 16px; color: #333;">
+        You have successfully completed your course. Please find your certificate attached as a PDF.
+      </p>
+      <p style="font-size: 16px; color: #333; margin-top: 30px;">
+        Regards, Team Ravallusion<br/>
+      </p>
+    </div>`;
+
             await sendEmail({
               to: user.email,
               subject: "Certificate",
-              html: "Certififcate",
+              html: html,
               attachments,
             });
 
@@ -454,7 +473,7 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
 
   if (!isAdmin && !currentCertificate) {
     throw new BadRequestError(
-      "Either course is not completed or assigments are pending"
+      "Either course is not completed or assignments are pending"
     );
   }
 

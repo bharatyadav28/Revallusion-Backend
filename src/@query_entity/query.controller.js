@@ -5,6 +5,7 @@ const { NotFoundError, BadRequestError } = require("../../errors/index.js");
 
 const { appendBucketName } = require("../../utils/helperFuns.js");
 const { s3Uploadv4Query } = require("../../utils/s3.js");
+const sendEmail = require("../../utils/sendEmail.js");
 
 // Create new query
 exports.createQuery = async (req, res) => {
@@ -41,6 +42,56 @@ exports.createQuery = async (req, res) => {
     message,
     profession,
     file: result?.Key,
+  });
+
+  const html = `<div style="font-family: Arial, sans-serif; line-height: 1.6;">
+      <h2>📩 New Query Submission</h2>
+      <table cellspacing="0" cellpadding="10" border="1" style="border-collapse: collapse; width: 100%;">
+        <tr>
+          <th align="left">Name</th>
+          <td>${name || "NA"}</td>
+        </tr>
+        <tr>
+          <th align="left">Email</th>
+          <td>${email || "NA"}</td>
+        </tr>
+        <tr>
+          <th align="left">Mobile</th>
+          <td>${mobile || "NA"}</td>
+        </tr>
+       
+        <tr>
+          <th align="left">Address</th>
+          <td>${address || "NA"}</td>
+        </tr>
+        <tr>
+          <th align="left">Profession</th>
+          <td>${profession || "NA"}</td>
+        </tr>
+        <tr>
+          <th align="left">Message</th>
+          <td>${message || "NA"}</td>
+        </tr>
+        <tr>
+          <th align="left">File</th>
+          <td>
+            ${
+              result?.Key
+                ? `<a href="${appendBucketName(
+                    result?.Key
+                  )}" target="_blank">View File</a>`
+                : "No file uploaded"
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  await sendEmail({
+    to: "yadavbharat386@gmail.com",
+    subject: "New Query",
+    html,
   });
 
   res.status(StatusCodes.CREATED).json({
