@@ -136,10 +136,7 @@ exports.auth = async (req, res, next) => {
     console.log("!!! Error in access token: ", accessError.message);
 
     // Check for refresh token validation
-    if (
-      refreshToken &&
-      (accessError.name === "TokenExpiredError" || !accessToken)
-    ) {
+    if (refreshToken) {
       try {
         await handleTokenRefresh({ req, res, refreshToken });
 
