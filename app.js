@@ -21,6 +21,7 @@ exports.instance = new Razorpay({
 });
 
 // Predefined middlewares
+app.set("trust proxy", true);
 app.use(express.json());
 app.use(
   cors({

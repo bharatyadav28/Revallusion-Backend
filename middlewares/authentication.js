@@ -4,6 +4,7 @@ const {
   generateDeviceId,
   getExistingUser,
   getTokenPayload,
+  getDeviceData,
 } = require("../utils/helperFuns");
 const {
   verify_token,
@@ -12,20 +13,48 @@ const {
 } = require("../utils/jwt");
 
 // Check if the session is valid
-const validateSession = async ({ user, deviceId, refreshToken }) => {
-  const session = user.activeSessions.find(
-    (s) => s.deviceInfo.deviceId === deviceId && s.refreshToken === refreshToken
-  );
+const validateSession = async ({
+  user,
+  ip,
+  os,
+  refreshToken,
+  browser = "postman",
+}) => {
+  const isValidToken = user.activeSessions.refreshTokens.includes(refreshToken);
 
-  if (!session) {
+  console.log("Valid refresh token", isValidToken);
+
+  if (!isValidToken) {
     throw new UnauthenticatedError("Invalid session");
   }
 
-  // Update session's last used timestamp
-  session.deviceInfo.lastUsed = new Date();
-  await user.save();
+  console.log(
+    "Auth validate",
+    user.activeSessions.ip !== ip,
+    user.activeSessions.primaryBrowser === browser,
+    browser,
+    ip,
+    os,
+    user.activeSessions.ip
+  );
+  if (user.activeSessions.ip !== ip)
+    if (
+      user.activeSessions.primaryBrowser === browser &&
+      user.activeSessions.os === os
+    ) {
+      user.activeSessions.ip = ip;
+      user.activeSessions.os = os;
 
-  return session;
+      await user.save();
+    } else {
+      user.activeSessions.refreshTokens =
+        user.activeSessions.refreshTokens?.filter(
+          (token) => token === refreshToken
+        );
+
+      await user.save();
+      throw new Error("Invalid session");
+    }
 };
 
 // Attach user details (token) to req object
@@ -36,6 +65,7 @@ const attachUserToReq = (req, user) => {
 
 // Generate new access token using if refresh token is valid
 const handleTokenRefresh = async ({ req, res, refreshToken }) => {
+  console.log("token refresh(new access token)");
   const refreshTokenPayload = verify_token({
     token: refreshToken,
     type: "refresh",
@@ -43,13 +73,14 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
   const userId = refreshTokenPayload.user._id;
   const existingUser = await getExistingUser(userId);
 
-  const deviceId = generateDeviceId(req);
-
+  const ua = getDeviceData(req);
   // Validate session
   await validateSession({
     user: existingUser,
-    deviceId,
+    ip: req.ip,
+    os: ua.os.name,
     refreshToken,
+    browser: ua.browser.name,
   });
 
   // Create new access token
@@ -57,20 +88,22 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
   const newAccessToken = createAccessToken(tokenPayload);
   attachAccessTokenToCookies({ res, accessToken: newAccessToken });
   attachUserToReq(req, existingUser);
+  console.log("token refresh complete");
 
   return;
 };
 
 // Authentication middleware
 exports.auth = async (req, res, next) => {
+  console.log("Authentication middleware");
   const { accessToken, refreshToken } = req.signedCookies;
 
-  if (!accessToken) {
-    console.log("First instance");
-    throw new UnauthenticatedError("Session expired, please login again");
-  }
-
   try {
+    if (!accessToken) {
+      console.log("NO access token");
+      throw new UnauthenticatedError("Session expired, please login again");
+    }
+
     const accessTokenpayload = verify_token({
       token: accessToken,
       type: "access",
@@ -87,13 +120,14 @@ exports.auth = async (req, res, next) => {
 
         throw new UnauthenticatedError("Session expired, please login again");
       }
-      const deviceId = generateDeviceId(req);
-
+      const ua = getDeviceData(req);
       // Validate session
       await validateSession({
         user: existingUser,
-        deviceId,
+        ip: req.ip,
+        os: ua.os.name,
         refreshToken,
+        browser: ua.browser.name,
       });
     }
 
@@ -102,10 +136,7 @@ exports.auth = async (req, res, next) => {
     console.log("!!! Error in access token: ", accessError.message);
 
     // Check for refresh token validation
-    if (
-      refreshToken &&
-      (accessError.name === "TokenExpiredError" || !accessToken)
-    ) {
+    if (refreshToken) {
       try {
         await handleTokenRefresh({ req, res, refreshToken });
 
@@ -114,9 +145,8 @@ exports.auth = async (req, res, next) => {
         console.log("!!! Error in refresh token: ", refreshError.message);
 
         // Clear cookies (invalid access and refresh token)
-        // res.clearCookie("accessToken");
-        // res.clearCookie("refreshToken");
-        console.log("Third instance");
+        res.clearCookie("accessToken");
+        res.clearCookie("refreshToken");
 
         throw new UnauthenticatedError("Session expired, please login again");
       }

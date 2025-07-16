@@ -36,6 +36,8 @@ exports.addPlan = async (req, res) => {
 
 // Get all plans
 exports.getPlans = async (req, res) => {
+  console.log("IP", req.ip);
+
   const plans = await PlanModel.find().lean();
 
   res.status(StatusCodes.OK).json({

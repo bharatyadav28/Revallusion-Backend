@@ -3,37 +3,29 @@ const validator = require("validator");
 const bcrypt = require("bcrypt");
 
 const activeSessionSchema = new mongoose.Schema({
-  refreshToken: {
+  ip: {
     type: String,
     trim: true,
-    required: [true, "Please provide refresh token"],
+    required: [true, "Please provide device's ip address"],
   },
-  deviceInfo: {
-    deviceId: {
-      type: String,
-      trim: true,
-      required: [true, "Please provide device Id"],
-    },
-    userAgent: {
-      type: String,
-      trim: true,
-      required: [true, "Please provide user agent"],
-    },
-    browser: {
-      type: String,
-      trim: true,
-      required: [true, "Please provide browser name"],
-    },
-    os: {
-      type: String,
-      trim: true,
-      required: [true, "Please provide os name"],
-    },
-    lastUsed: {
-      type: Date,
-      default: Date.now(),
-    },
+  os: {
+    type: String,
+    trim: true,
+    required: [true, "Please provide os name"],
   },
+  primaryBrowser: {
+    type: String,
+    trim: true,
+    required: [true, "Please provide browser name"],
+  },
+
+  primaryBrowser: {
+    type: String,
+    trim: true,
+    required: [true, "Please provide os"],
+  },
+
+  refreshTokens: [String],
 });
 
 // User Schema
@@ -46,7 +38,6 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
       trim: true,
-      // default: "https://cdn-icons-png.flaticon.com/512/5556/5556499.png",
     },
 
     email: {
@@ -94,7 +85,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
-    activeSessions: [activeSessionSchema],
+    activeSessions: activeSessionSchema,
 
     isDeleted: {
       type: Boolean,

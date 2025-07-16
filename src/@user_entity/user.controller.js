@@ -177,13 +177,12 @@ exports.googleAuth = async (req, res) => {
   const ua = getDeviceData(req);
 
   // Check if user is already logged in on a different device
-  detectMultipleSessions({ res, user, currentDeviceId: deviceId });
+  detectMultipleSessions({ res, user, ip: req.ip, os: ua.os.name });
 
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
-    deviceId,
     ua,
   });
 
@@ -197,18 +196,23 @@ exports.googleAuth = async (req, res) => {
 };
 
 // Helper function to check if user is already logged in on a different device
-const detectMultipleSessions = ({ res, user, currentDeviceId }) => {
-  if (user.activeSessions.length == 0) return;
+const detectMultipleSessions = ({ res, user, ip, os }) => {
+  if (!user?.activeSessions?.ip) {
+    return;
+  }
 
-  const otherDeviceSession = user.activeSessions.find(
-    (session) => session.deviceInfo.deviceId !== currentDeviceId
+  const otherDeviceSession = !(
+    String(user?.activeSessions?.ip) === String(ip) &&
+    String(user?.activeSessions?.os) === String(os)
   );
-  // const otherDeviceSession = user.activeSessions.find((session) => {
-  //   console.log("deviceid1 : ", session.deviceInfo.deviceId);
-  //   console.log("deviceid2 : ", currentDeviceId);
-
-  //   return session.deviceInfo.deviceId !== currentDeviceId;
-  // });
+  console.log(
+    "Detect multiple session",
+    otherDeviceSession,
+    user?.activeSessions?.ip,
+    ip,
+    user?.activeSessions?.os,
+    os
+  );
 
   if (otherDeviceSession) {
     const payload = getTokenPayload(user);
@@ -224,43 +228,35 @@ exports.updateSessionAndCreateTokens = async ({
   req,
   res,
   user,
-  deviceId,
   ua,
   keepMeSignedIn = false,
+  isNewDevice = false,
 }) => {
+  console.log("updateSessionAndCreateTokens");
   user = await userModel.findById(user._id);
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
   const refreshToken = createRefreshToken(tokenPayoad, keepMeSignedIn);
+  const activeSessions = user?.activeSessions || {};
 
-  // Update or add session information
-  const sessionInfo = {
-    refreshToken,
-    deviceInfo: {
-      deviceId,
-      userAgent: req.headers["user-agent"],
-      browser: `${ua.browser.name} ${ua.browser.version}`,
-      os: `${ua.os.name} ${ua.os.version}`,
-      lastUsed: new Date(),
-    },
-  };
+  const savedRefreshTokens = activeSessions?.refreshTokens;
 
-  // Find and update existing session for this device or add new one
-  const existingSessionIndex = user.activeSessions.findIndex(
-    (session) =>
-      session.deviceInfo.deviceId === deviceId &&
-      session.deviceInfo.userAgent === req.headers["user-agent"]
-  );
+  activeSessions.ip = req.ip;
+  activeSessions.os = ua.os.name;
 
-  if (existingSessionIndex >= 0) {
-    user.activeSessions[existingSessionIndex] = sessionInfo;
+  if (isNewDevice || !activeSessions?.primaryBrowser) {
+    console.log("Is new device");
+    activeSessions.primaryBrowser = ua?.browser?.name || "postman";
+    activeSessions.refreshTokens = [refreshToken];
   } else {
-    if (user.role !== "user" && user.activeSessions.length >= 10) {
-      // Only 10 active logins for admin/staff
-      user.activeSessions.shift();
-    }
-    user.activeSessions.push(sessionInfo);
+    activeSessions.refreshTokens = savedRefreshTokens
+      ? [...savedRefreshTokens, refreshToken]
+      : [refreshToken];
   }
+
+  console.log("Active sessons", activeSessions);
+  user.activeSessions = activeSessions;
+
   await user.save();
 
   attachCookiesToResponse({ res, accessToken, refreshToken, keepMeSignedIn });
@@ -282,19 +278,21 @@ exports.verifyUser = async (req, res) => {
 
   let query = { otp, type, userId, email };
   await OTPManager.verifyOTP(query);
-  if (type === "account_verification") user.isEmailVerified = true;
+  if (type === "account_verification") {
+    user.isEmailVerified = true;
+    await user.save();
+  }
 
-  const deviceId = generateDeviceId(req);
   const ua = getDeviceData(req);
+  console.log(" Signin UA", ua);
 
   // Check if user is already logged in on a different device
-  detectMultipleSessions({ res, user, currentDeviceId: deviceId });
+  detectMultipleSessions({ res, user, ip: req.ip, os: ua.os.name });
 
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user,
-    deviceId,
     ua,
     keepMeSignedIn,
   });
@@ -314,17 +312,13 @@ exports.switchDevice = async (req, res) => {
 
   const existingUser = await getExistingUser(payload.user._id);
 
-  existingUser.activeSessions = [];
-  await existingUser.save();
-
-  const deviceId = generateDeviceId(req);
   const ua = getDeviceData(req);
   await exports.updateSessionAndCreateTokens({
     req,
     res,
     user: existingUser,
-    deviceId,
     ua,
+    isNewDevice: true,
   });
 
   res.clearCookie("tempToken");
@@ -336,7 +330,6 @@ exports.switchDevice = async (req, res) => {
 
 exports.logout = async (req, res) => {
   const { refreshToken } = req.signedCookies;
-  const deviceId = generateDeviceId(req);
 
   const user = await userModel.findOne({
     _id: req.user._id,
@@ -346,14 +339,11 @@ exports.logout = async (req, res) => {
     throw new NotFoundError("User not found");
   }
 
-  // Remove current ssession from user model
-  user.activeSessions = user.activeSessions?.filter(
-    (session) =>
-      !(
-        session.refreshToken === refreshToken &&
-        session.deviceInfo.deviceId === deviceId
-      )
-  );
+  // Remove current session from user model
+  user.activeSessions.refreshTokens =
+    user.activeSessions?.refreshTokens?.filter(
+      (token) => token !== refreshToken
+    );
   await user.save();
 
   // clear token cookies
