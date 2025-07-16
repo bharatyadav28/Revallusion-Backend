@@ -330,7 +330,6 @@ exports.switchDevice = async (req, res) => {
 
 exports.logout = async (req, res) => {
   const { refreshToken } = req.signedCookies;
-  const deviceId = generateDeviceId(req);
 
   const user = await userModel.findOne({
     _id: req.user._id,
@@ -340,7 +339,7 @@ exports.logout = async (req, res) => {
     throw new NotFoundError("User not found");
   }
 
-  // Remove current ssession from user model
+  // Remove current session from user model
   user.activeSessions.refreshTokens =
     user.activeSessions?.refreshTokens?.filter(
       (token) => token !== refreshToken
