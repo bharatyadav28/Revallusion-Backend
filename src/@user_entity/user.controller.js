@@ -205,14 +205,7 @@ const detectMultipleSessions = ({ res, user, ip, os }) => {
     String(user?.activeSessions?.ip) === String(ip) &&
     String(user?.activeSessions?.os) === String(os)
   );
-  console.log(
-    "Detect multiple session",
-    otherDeviceSession,
-    user?.activeSessions?.ip,
-    ip,
-    user?.activeSessions?.os,
-    os
-  );
+  console.log("Detect multiple session");
 
   if (otherDeviceSession) {
     const payload = getTokenPayload(user);
@@ -242,7 +235,7 @@ exports.updateSessionAndCreateTokens = async ({
   const savedRefreshTokens = activeSessions?.refreshTokens;
 
   activeSessions.ip = req.ip;
-  activeSessions.os = ua.os.name;
+  activeSessions.os = ua.os.name || "test";
 
   if (isNewDevice || !activeSessions?.primaryBrowser) {
     console.log("Is new device");
@@ -254,7 +247,6 @@ exports.updateSessionAndCreateTokens = async ({
       : [refreshToken];
   }
 
-  console.log("Active sessons", activeSessions);
   user.activeSessions = activeSessions;
 
   await user.save();
@@ -284,7 +276,6 @@ exports.verifyUser = async (req, res) => {
   }
 
   const ua = getDeviceData(req);
-  console.log(" Signin UA", ua);
 
   // Check if user is already logged in on a different device
   detectMultipleSessions({ res, user, ip: req.ip, os: ua.os.name });

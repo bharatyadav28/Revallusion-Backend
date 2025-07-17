@@ -89,7 +89,7 @@ exports.createQuery = async (req, res) => {
   `;
 
   await sendEmail({
-    to: "yadavbharat386@gmail.com",
+    to: "ravallusionacademy@gmail.com",
     subject: "New Query",
     html,
   });

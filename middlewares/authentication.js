@@ -28,15 +28,6 @@ const validateSession = async ({
     throw new UnauthenticatedError("Invalid session");
   }
 
-  console.log(
-    "Auth validate",
-    user.activeSessions.ip !== ip,
-    user.activeSessions.primaryBrowser === browser,
-    browser,
-    ip,
-    os,
-    user.activeSessions.ip
-  );
   if (user.activeSessions.ip !== ip)
     if (
       user.activeSessions.primaryBrowser === browser &&
@@ -116,7 +107,7 @@ exports.auth = async (req, res, next) => {
 
     if (existingUser.role === "user") {
       if (!refreshToken) {
-        console.log("Second instance");
+        console.log("No existing refresh token");
 
         throw new UnauthenticatedError("Session expired, please login again");
       }
@@ -137,6 +128,7 @@ exports.auth = async (req, res, next) => {
 
     // Check for refresh token validation
     if (refreshToken) {
+      console.log("refresh token exists");
       try {
         await handleTokenRefresh({ req, res, refreshToken });
 
@@ -151,6 +143,8 @@ exports.auth = async (req, res, next) => {
         throw new UnauthenticatedError("Session expired, please login again");
       }
     } else {
+      console.log("No refresh token exists");
+
       // res.clearCookie("accessToken");
       // res.clearCookie("refreshToken");
       throw new UnauthenticatedError(

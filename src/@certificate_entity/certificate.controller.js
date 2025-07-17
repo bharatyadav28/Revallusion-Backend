@@ -219,13 +219,36 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
         // videos: { $push: "$$ROOT" },
         inCompleteVideos: { $sum: { $cond: ["$isCompleted", 0, 1] } },
         totalAssignments: {
-          $sum: { $cond: [{ $ifNull: ["$assignment", false] }, 1, 0] },
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$assignment", null] },
+                  { $ne: ["$assignment", ""] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
         },
         scoresSum: {
           $sum: { $ifNull: ["$assignmentScore", 0] },
         },
         unGradedAssignments: {
-          $sum: { $cond: [{ $ifNull: ["$assignmentScore", 0] }, 0, 1] },
+          $sum: {
+            $cond: [
+              {
+                $and: [
+                  { $ne: ["$assignment", null] },
+                  { $ne: ["$assignment", ""] },
+                  { $eq: ["$assignmentScore", null] },
+                ],
+              },
+              1,
+              0,
+            ],
+          },
         },
       },
     },
@@ -234,6 +257,7 @@ const calculateProgress = async ({ user, activePlan, isAdmin }) => {
   if (!progress.length) {
     throw new BadRequestError("No progress found for enrolled courses");
   }
+
   const { inCompleteVideos, totalAssignments, scoresSum, unGradedAssignments } =
     progress[0];
 

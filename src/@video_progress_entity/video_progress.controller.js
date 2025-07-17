@@ -9,6 +9,9 @@ const { default: mongoose } = require("mongoose");
 const orderModel = require("../@order_entity/order.model");
 const PlanModel = require("../@plan_entity/plan.model");
 const CourseModel = require("../@course_entity/course.model");
+const {
+  saveUserProgress,
+} = require("../@certificate_entity/certificate.controller");
 
 // Update video progress
 exports.updateVideoProgress = async (req, res, next) => {
@@ -67,7 +70,17 @@ exports.updateVideoProgress = async (req, res, next) => {
     );
   }
 
+  const isVideoAlreadyComplete = videoProgress?.isCompleted;
+
   await videoProgress.save();
+
+  const updatedVideoProgress = await VideoProgressModel.findById(
+    videoProgress._id
+  );
+
+  if (updatedVideoProgress?.isCompleted && !isVideoAlreadyComplete) {
+    await saveUserProgress(userId);
+  }
 
   const filteredVideoProgress = {
     video: videoProgress.video,

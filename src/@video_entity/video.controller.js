@@ -381,7 +381,7 @@ exports.updateVideo = async (req, res, next) => {
   if (description) video.description = description;
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
   if (resource) video.resource = resource;
-  if (assignment) video.assignment = assignment;
+  video.assignment = assignment ? assignment : "";
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists
