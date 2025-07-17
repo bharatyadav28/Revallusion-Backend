@@ -5,12 +5,15 @@ const api = process.env.SENDGRIP_API;
 sg.setApiKey(api);
 
 const sendEmail = async ({ to, subject, html, attachments }) => {
-  const isProdEnv = process.env.NODE_ENV === "production";
+  const isProdEnv = !(process.env.NODE_ENV === "production");
 
   if (isProdEnv) {
     const mailOptions = {
       to,
-      from: "contact@ravallusion.com",
+      from: {
+        email: "contact@ravallusion.com",
+        name: "Ravallusion",
+      },
       subject,
       html,
     };
@@ -37,7 +40,11 @@ const sendEmail = async ({ to, subject, html, attachments }) => {
     });
 
     const mailOptions = {
-      from: '"Ravallusion" < ravallusionacademy@gmail.com>',
+      from: {
+        email: "contact@ravallusion.com",
+        name: "Ravallusion",
+      },
+      // from: '"Ravallusion" < ravallusionacademy@gmail.com>',
       to,
       subject,
       html,
