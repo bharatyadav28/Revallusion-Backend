@@ -470,9 +470,9 @@ exports.subscribedCourseAssignments = async (req, res) => {
         isDeleted: false,
         $expr: {
           $and: [
-            { $ne: ["$assignments", null] },
-            { $ne: ["$assignments", ""] },
-            { $ne: [{ $type: "$assignments" }, "missing"] },
+            { $ne: ["$assignment", null] },
+            { $ne: ["$assignment", ""] },
+            { $ne: [{ $type: "$assignment" }, "missing"] },
           ],
         },
       },
