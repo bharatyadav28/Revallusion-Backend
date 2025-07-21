@@ -1,4 +1,5 @@
 const StatusCodes = require("http-status-codes");
+const crypto = require("crypto");
 
 const {
   BadRequestError,
@@ -25,7 +26,7 @@ const {
 const OTPManager = require("../../utils/OTPManager.js");
 const OrderModel = require("../@order_entity/order.model.js");
 const { s3Uploadv4 } = require("../../utils/s3.js");
-const { default: mongoose } = require("mongoose");
+const mailchimp = require("@mailchimp/mailchimp_marketing");
 
 // send auth user details
 exports.sendMe = async (req, res) => {
@@ -78,6 +79,25 @@ exports.signin = async (req, res) => {
   if (!user || !isVerified) {
     if (!user) {
       user = await userModel.create({ email });
+
+      mailchimp.setConfig({
+        apiKey: process.env.MAILCHIMP_KEY,
+        server: "us20",
+      });
+
+      const subscriberHash = crypto
+        .createHash("md5")
+        .update(email?.toLowerCase())
+        .digest("hex");
+
+      // Add user to Mailchimp list
+      await mailchimp.lists.setListMember("8ccfdb34d3", subscriberHash, {
+        email_address: email?.toLowerCase(),
+        status_if_new: "subscribed",
+        merge_fields: {
+          FNAME: user?._id,
+        },
+      });
     } else {
       user.email = email;
       // user.password = password;
