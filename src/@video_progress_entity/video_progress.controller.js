@@ -246,6 +246,7 @@ exports.yourProgress = async (req, res) => {
     {
       $match: {
         course: { $in: coursesArray },
+        isDeleted: false,
       },
     },
     {

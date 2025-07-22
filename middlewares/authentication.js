@@ -22,8 +22,6 @@ const validateSession = async ({
 }) => {
   const isValidToken = user.activeSessions.refreshTokens.includes(refreshToken);
 
-  console.log("Valid refresh token", isValidToken);
-
   if (!isValidToken) {
     throw new UnauthenticatedError("Invalid session");
   }
@@ -56,7 +54,6 @@ const attachUserToReq = (req, user) => {
 
 // Generate new access token using if refresh token is valid
 const handleTokenRefresh = async ({ req, res, refreshToken }) => {
-  console.log("token refresh(new access token)");
   const refreshTokenPayload = verify_token({
     token: refreshToken,
     type: "refresh",
@@ -79,19 +76,16 @@ const handleTokenRefresh = async ({ req, res, refreshToken }) => {
   const newAccessToken = createAccessToken(tokenPayload);
   attachAccessTokenToCookies({ res, accessToken: newAccessToken });
   attachUserToReq(req, existingUser);
-  console.log("token refresh complete");
 
   return;
 };
 
 // Authentication middleware
 exports.auth = async (req, res, next) => {
-  console.log("Authentication middleware");
   const { accessToken, refreshToken } = req.signedCookies;
 
   try {
     if (!accessToken) {
-      console.log("NO access token");
       throw new UnauthenticatedError("Session expired, please login again");
     }
 
@@ -107,8 +101,6 @@ exports.auth = async (req, res, next) => {
 
     if (existingUser.role === "user") {
       if (!refreshToken) {
-        console.log("No existing refresh token");
-
         throw new UnauthenticatedError("Session expired, please login again");
       }
       const ua = getDeviceData(req);
@@ -128,7 +120,6 @@ exports.auth = async (req, res, next) => {
 
     // Check for refresh token validation
     if (refreshToken) {
-      console.log("refresh token exists");
       try {
         await handleTokenRefresh({ req, res, refreshToken });
 
@@ -143,8 +134,6 @@ exports.auth = async (req, res, next) => {
         throw new UnauthenticatedError("Session expired, please login again");
       }
     } else {
-      console.log("No refresh token exists");
-
       // res.clearCookie("accessToken");
       // res.clearCookie("refreshToken");
       throw new UnauthenticatedError(

@@ -28,6 +28,7 @@ const {
 const { getTokenPayload } = require("../../utils/helperFuns");
 const { createAccessToken } = require("../../utils/jwt");
 const { attachAccessTokenToCookies } = require("../../utils/jwt");
+// const { handleWhatsAppMessage } = require("../../utils/whatsapp");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -1185,5 +1186,22 @@ exports.restoreUser = async (req, res) => {
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "User restored successfully",
+  });
+};
+
+exports.sendWhatsAppMessage = async (req, res) => {
+  const { message } = req.body;
+  if (!message) {
+    throw new BadRequestError("Message cannot be empty");
+  }
+
+  // const response = await handleWhatsAppMessage(message);
+  if (!response) {
+    throw new BadRequestError("Failed to send WhatsApp message");
+  }
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "WhatsApp message sent successfully",
+    data: { response },
   });
 };

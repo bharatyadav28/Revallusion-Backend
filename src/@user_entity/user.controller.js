@@ -184,6 +184,25 @@ exports.googleAuth = async (req, res) => {
         // avatar: picture,
         isEmailVerified: true,
       });
+
+      mailchimp.setConfig({
+        apiKey: process.env.MAILCHIMP_KEY,
+        server: "us20",
+      });
+
+      const subscriberHash = crypto
+        .createHash("md5")
+        .update(email?.toLowerCase())
+        .digest("hex");
+
+      // Add user to Mailchimp list
+      await mailchimp.lists.setListMember("8ccfdb34d3", subscriberHash, {
+        email_address: email?.toLowerCase(),
+        status_if_new: "subscribed",
+        merge_fields: {
+          FNAME: user?.name || user?._id,
+        },
+      });
     } else {
       if (name) user.name = name;
       // if (picture) user.avatar = picture;
@@ -225,7 +244,6 @@ const detectMultipleSessions = ({ res, user, ip, os }) => {
     String(user?.activeSessions?.ip) === String(ip) &&
     String(user?.activeSessions?.os) === String(os)
   );
-  console.log("Detect multiple session");
 
   if (otherDeviceSession) {
     const payload = getTokenPayload(user);
@@ -245,7 +263,6 @@ exports.updateSessionAndCreateTokens = async ({
   keepMeSignedIn = false,
   isNewDevice = false,
 }) => {
-  console.log("updateSessionAndCreateTokens");
   user = await userModel.findById(user._id);
   const tokenPayoad = getTokenPayload(user);
   const accessToken = createAccessToken(tokenPayoad);
@@ -258,7 +275,6 @@ exports.updateSessionAndCreateTokens = async ({
   activeSessions.os = ua.os.name || "test";
 
   if (isNewDevice || !activeSessions?.primaryBrowser) {
-    console.log("Is new device");
     activeSessions.primaryBrowser = ua?.browser?.name || "postman";
     activeSessions.refreshTokens = [refreshToken];
   } else {

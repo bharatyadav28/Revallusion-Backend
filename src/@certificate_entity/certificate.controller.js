@@ -306,47 +306,85 @@ exports.saveUserProgress = async (userId) => {
   ]);
 
   if (activeOrder) {
-    const activePlan = activeOrder.plan;
-    const user = { _id: activeOrder.user };
-    const completionTime = Math.floor(
-      (new Date() - activeOrder.createdAt) / 1000
-    );
+    const isSupersetPlan = activeOrder?.plan?.level >= 1;
+    let coveredPlans = [activeOrder.plan];
 
-    const { progress, averageAssigmentsScore } = await calculateProgress({
-      user,
-      activePlan,
-      isAdmin: false,
-    });
+    if (isSupersetPlan) {
+      coveredPlans = await PlanModel.find({
+        level: { $lte: activeOrder.plan.level },
+      })
+        .sort({ level: -1 })
+        .lean();
+    }
 
-    if (progress && averageAssigmentsScore) {
-      const existingProgress = await CertificateModel.findOne({
-        user: userId,
-        plan: activePlan,
+    for (const activePlan of coveredPlans) {
+      // const activePlan = activeOrder.plan;
+      const user = { _id: activeOrder.user };
+      const completionTime = Math.floor(
+        (new Date() - activeOrder.createdAt) / 1000
+      );
+
+      const { progress, averageAssigmentsScore } = await calculateProgress({
+        user,
+        activePlan,
+        isAdmin: false,
       });
-      if (existingProgress) {
-        existingProgress.averageAssigmentsScore = averageAssigmentsScore;
-        existingProgress.totalAssignments = progress[0].totalAssignments;
-        existingProgress.scoresSum = progress[0].scoresSum;
-        existingProgress.completionTime = completionTime;
 
-        await existingProgress.save();
-      } else {
-        await CertificateModel.create({
+      if (progress && averageAssigmentsScore) {
+        const existingProgressPromise = await CertificateModel.findOne({
           user: userId,
-          plan: activePlan,
-          averageAssigmentsScore,
-          totalAssignments: progress[0].totalAssignments,
-          scoresSum: progress[0].scoresSum,
-          completionTime,
+          plan: activePlan._id,
         });
-      }
 
-      const user = await userModel.findById(userId);
-      if (user) {
-        await certificateAvailableEmail({
-          name: user?.name || userId,
-          email: user.email,
+        const hasIssuedCertificatePromise = await CertificateModel.findOne({
+          user: userId,
+          plan: { $ne: activePlan._id },
+          isIssued: true,
         });
+
+        let [existingProgress, hasIssuedCertificate] = await Promise.all([
+          existingProgressPromise,
+          hasIssuedCertificatePromise,
+        ]);
+
+        if (existingProgress) {
+          if (existingProgress.isIssued) {
+            break;
+          }
+          existingProgress.averageAssigmentsScore = averageAssigmentsScore;
+          existingProgress.totalAssignments = progress[0].totalAssignments;
+          existingProgress.scoresSum = progress[0].scoresSum;
+          existingProgress.completionTime = completionTime;
+
+          await existingProgress.save();
+        } else {
+          existingProgress = await CertificateModel.create({
+            user: userId,
+            plan: activePlan,
+            averageAssigmentsScore,
+            totalAssignments: progress[0].totalAssignments,
+            scoresSum: progress[0].scoresSum,
+            completionTime,
+          });
+        }
+
+        const user = await userModel.findById(userId);
+        if (user) {
+          if (hasIssuedCertificate) {
+            await createCertificate({
+              name: user?.name || userId,
+              planId: activePlan._id,
+              userId,
+            });
+          }
+
+          await certificateAvailableEmail({
+            name: user?.name || userId,
+            email: user.email,
+          });
+        }
+      } else {
+        break;
       }
     }
   }
@@ -526,6 +564,8 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
   }
 
   user.name = name;
+  await user.save();
+
   const data = await createCertificateBuffer({
     user,
     averageAssigmentsScore: currentCertificate,
@@ -557,19 +597,32 @@ exports.generateMyCertificate = async (req, res) => {
   const activeOrder = await OrderModel.findOne({
     user: userId,
     status: "Active",
-  });
+  }).populate("plan");
 
   if (!activeOrder) {
     throw new BadRequestError("No active plan found");
   }
 
-  const planId = activeOrder?.plan;
+  let coveredPlans = [activeOrder.plan];
+  const isSupersetPlan = activeOrder?.plan?.level >= 1;
 
-  await createCertificate({
-    name,
-    planId,
-    userId,
-  });
+  if (isSupersetPlan) {
+    coveredPlans = await PlanModel.find({
+      level: { $lte: activeOrder.plan.level },
+    })
+      .sort({ level: -1 })
+      .lean();
+  }
+
+  for (const plan of coveredPlans) {
+    const planId = plan?._id;
+
+    await createCertificate({
+      name,
+      planId,
+      userId,
+    });
+  }
 
   return res.status(StatusCodes.OK).json({
     success: true,

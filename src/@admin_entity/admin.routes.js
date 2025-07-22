@@ -16,6 +16,7 @@ const {
   sendMeAdmin,
   getDashBoardContent,
   restoreUser,
+  sendWhatsAppMessage,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 
@@ -50,5 +51,7 @@ router
 router.route("/users/:id/restore").put(auth, isAdmin, restoreUser);
 
 router.route("/dashboard").get(auth, isAdmin, getDashBoardContent);
+
+router.route("/whatsapp").post(auth, isAdmin, sendWhatsAppMessage);
 
 module.exports = router;

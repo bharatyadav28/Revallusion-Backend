@@ -31,16 +31,16 @@ exports.uploadAssignmentAnswer = async (req, res) => {
   }
 
   const ext = path.extname(req.file.originalname).toLowerCase();
-  if (ext !== ".rar") {
-    return res
-      .status(StatusCodes.BAD_REQUEST)
-      .json({ message: "Invalid file type. Only .rar files are allowed!" });
-  }
+  // if (ext !== ".rar") {
+  //   return res
+  //     .status(StatusCodes.BAD_REQUEST)
+  //     .json({ message: "Invalid file type. Only .rar files are allowed!" });
+  // }
 
   // Validate file size
-  if (req.file.size > 50 * 1024 * 1024) {
-    throw new BadRequestError("File size should be less than 50MB");
-  }
+  // if (req.file.size > 50 * 1024 * 1024) {
+  //   throw new BadRequestError("File size should be less than 50MB");
+  // }
 
   // Get file type
   result = await s3Uploadv4(req.file, "submitted_assignments");

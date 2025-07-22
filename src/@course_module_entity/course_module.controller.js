@@ -84,8 +84,6 @@ exports.deleteModule = async (req, res) => {
     },
   ]);
 
-  console.log("submodules", submodules);
-
   for (const submodule of submodules) {
     const module = submodule.module;
     const submoduleId = submodule._id;
