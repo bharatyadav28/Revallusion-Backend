@@ -330,7 +330,10 @@ exports.saveUserProgress = async (userId) => {
         isAdmin: false,
       });
 
-      if (progress && averageAssigmentsScore) {
+      if (
+        progress &&
+        (averageAssigmentsScore || averageAssigmentsScore === 0)
+      ) {
         const existingProgressPromise = await CertificateModel.findOne({
           user: userId,
           plan: activePlan._id,
@@ -468,13 +471,13 @@ const createCertificateBuffer = async ({
             ];
 
             const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="color: #2e86de;">🎓 Congratulations, ${name}!</h2>
+      <h2 style="color: #091528;">🎓 Congratulations, ${name}!</h2>
       <p style="font-size: 16px; color: #333;">
         You have successfully completed your course. Please find your certificate attached as a PDF.
       </p>
-      <p style="font-size: 16px; color: #333; margin-top: 30px;">
-        Regards, Team Ravallusion<br/>
-      </p>
+       <div style="color: #888888">
+        <p style="margin-bottom: 10px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
+      </div>
     </div>`;
 
             await sendEmail({

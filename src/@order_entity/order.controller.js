@@ -433,6 +433,11 @@ exports.createPaypalOrder = async (req, res) => {
       },
       body: JSON.stringify({
         intent: "CAPTURE",
+        application_context: {
+          brand_name: "Ravallusion",
+          landing_page: "LOGIN", // or "BILLING"
+          user_action: "PAY_NOW", // Forces immediate payment
+        },
         purchase_units: [
           {
             amount: {

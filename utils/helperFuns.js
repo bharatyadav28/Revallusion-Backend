@@ -263,7 +263,7 @@ exports.generateUniqueId = () => {
 exports.certificateAvailableEmail = async ({ name, email }) => {
   const html = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="color: #2e86de;">🎓 Congratulations, ${name}!</h2>
+      <h2 style="color: #091528;">🎓 Congratulations, ${name}!</h2>
       <p style="font-size: 16px; color: #333;">
         You have successfully completed your course. Your certificate is now available.
       </p>
@@ -272,7 +272,7 @@ exports.certificateAvailableEmail = async ({ name, email }) => {
       </p>
       <p style="margin: 20px 0;">
         <a href="https://www.ravallusion.com/dashboard" target="_blank" style="
-          background-color: #007bff;
+          background-color: #b19cd9;
           color: white;
           padding: 10px 20px;
           text-decoration: none;
@@ -280,9 +280,9 @@ exports.certificateAvailableEmail = async ({ name, email }) => {
           font-weight: bold;
         ">Go to Dashboard</a>
       </p>
-      <p style="font-size: 16px; color: #333; margin-top: 30px;">
-        Regards, Team Ravallusion<br/>
-      </p>
+     <div style="color: #888888">
+        <p style="margin-bottom: 10px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
+      </div>
     </div>
   `;
 
