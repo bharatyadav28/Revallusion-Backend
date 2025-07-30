@@ -131,6 +131,90 @@ exports.getCourseProgress = async (req, res) => {
   const userId = req.user._id;
   const { cid: courseId } = req.params;
 
+  const [coveredCoursesObj] = await orderModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        status: "Active",
+        expiry_date: { $gte: new Date() },
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        let: {
+          planId: "$plan",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$planId"] },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              name: "$plan_type",
+              level: "$level",
+            },
+          },
+        ],
+        as: "plan",
+      },
+    },
+    {
+      $unwind: {
+        path: "$plan",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    {
+      $lookup: {
+        from: "courses",
+        let: {
+          level: "$plan.level",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $lte: ["$level", "$$level"] },
+                  { $gt: ["$level", 0] }, // Exclude level 0
+                ],
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              title: 1,
+            },
+          },
+        ],
+        as: "courses",
+      },
+    },
+    {
+      $unwind: "$courses",
+    },
+    {
+      $group: {
+        _id: null,
+        courseIds: { $addToSet: "$courses._id" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        courseIds: 1,
+      },
+    },
+  ]);
+
+  const coveredCourses = coveredCoursesObj?.courseIds || [];
+
   const courseProgress = await VideoProgressModel.aggregate([
     {
       $match: {
@@ -151,7 +235,7 @@ exports.getCourseProgress = async (req, res) => {
         pipeline: [
           {
             $match: {
-              course: new mongoose.Types.ObjectId(courseId),
+              course: { $in: coveredCourses },
             },
           },
         ],
