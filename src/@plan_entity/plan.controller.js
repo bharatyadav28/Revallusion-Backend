@@ -36,7 +36,7 @@ exports.addPlan = async (req, res) => {
 
 // Get all plans
 exports.getPlans = async (req, res) => {
-  const plans = await PlanModel.find().lean();
+  const plans = await PlanModel.find().sort({ level: 1 }).lean();
 
   res.status(StatusCodes.OK).json({
     success: true,
