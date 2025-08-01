@@ -648,3 +648,117 @@ exports.mySubscription = async (req, res) => {
     },
   });
 };
+
+exports.getorderHistory = async (req, res) => {
+  const userId = req.user._id;
+
+  const orders = await OrderModel.aggregate([
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        status: { $in: ["Active", "Expire"] },
+      },
+    },
+    {
+      $lookup: {
+        from: "plans",
+        let: { planId: "$plan" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$_id", "$$planId"] },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              plan_type: 1,
+            },
+          },
+        ],
+        as: "plan",
+      },
+    },
+    {
+      $lookup: {
+        from: "transactions",
+        let: { orderId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$order", "$$orderId"] },
+            },
+          },
+          {
+            $set: {
+              invoice_url: {
+                $cond: {
+                  if: {
+                    $and: [
+                      { $ifNull: ["$invoice_url", false] },
+                      { $ne: ["$invoice_url", ""] },
+                    ],
+                  },
+                  then: {
+                    $concat: [awsUrl, "/", { $toString: "$invoice_url" }],
+                  },
+                  else: null,
+                },
+              },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+              invoice_url: 1,
+            },
+          },
+        ],
+        as: "transaction",
+      },
+    },
+    {
+      $set: {
+        planType: { $arrayElemAt: ["$plan.plan_type", 0] },
+        invoice_url: { $arrayElemAt: ["$transaction.invoice_url", 0] },
+        paidOn: {
+          $dateToString: {
+            format: "%d/%m/%Y",
+            date: "$start_date",
+          },
+        },
+        remainingDays: {
+          $floor: {
+            $divide: [
+              { $subtract: ["$expiry_date", new Date()] },
+              1000 * 60 * 60 * 24,
+            ],
+          },
+        },
+      },
+    },
+    {
+      $sort: {
+        createdAt: -1,
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        planType: 1,
+        invoice_url: 1,
+        paidOn: 1,
+        // hasUpgraded: 1,
+        status: 1,
+      },
+    },
+  ]);
+
+  return res.status(StatusCodes.OK).json({
+    succes: true,
+    message: "Subscription details fetched successfully",
+    data: {
+      orders,
+    },
+  });
+};

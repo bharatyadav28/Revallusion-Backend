@@ -11,6 +11,7 @@ const {
   verifyCashFreePayment,
   createPaypalOrder,
   verifyPaypalOrder,
+  getorderHistory,
 } = require("./order.controller");
 
 const router = express.Router();
@@ -31,5 +32,7 @@ router.route("/paypal/:id").post(auth, verifyPaypalOrder);
 router.route("/has-subscription/:userId").get(hasSubscription);
 
 router.route("/my-subscription").get(auth, mySubscription);
+
+router.route("/history").get(auth, getorderHistory);
 
 module.exports = router;
