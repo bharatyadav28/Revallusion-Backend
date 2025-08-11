@@ -437,6 +437,9 @@ exports.createPaypalOrder = async (req, res) => {
           brand_name: "Ravallusion",
           landing_page: "LOGIN", // or "BILLING"
           user_action: "PAY_NOW", // Forces immediate payment
+          return_url: `${process.env.FRONTEND_URL}/rajorpay-payment-success`, // frontend should call backend capture with token=id
+          cancel_url: `${process.env.FRONTEND_URL}`,
+          shipping_preference: "NO_SHIPPING",
         },
         purchase_units: [
           {
