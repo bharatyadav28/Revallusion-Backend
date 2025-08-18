@@ -218,9 +218,10 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
         lineGap: 5,
       })
       .text("Email Id: " + user.email?.slice(0, 30), xColumn1, doc.y, {
-        lineGap: 1,
+        lineGap: 5,
       })
-      .text(user.email?.slice(30), xColumn1, doc.y, {
+
+      .text("State: " + user?.state || "NA", xColumn1, doc.y, {
         lineGap: 10,
       });
 
