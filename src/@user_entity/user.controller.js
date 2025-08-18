@@ -559,3 +559,45 @@ exports.deleteAccount = async (req, res) => {
     message: "Account deleted successfully",
   });
 };
+
+exports.getInvoiceProfileDetails = async (req, res) => {
+  const userId = req.user._id;
+
+  const user = await userModel.findById(userId).select("name state");
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Invoice profile details fetched successfully",
+    data: { user },
+  });
+};
+
+exports.updateInvoiceProfileDetails = async (req, res) => {
+  const userId = req.user._id;
+  const { name, state } = req.body;
+
+  if (!name || !state) {
+    throw new BadRequestError("Please provide all required fields");
+  }
+
+  const user = await userModel.findByIdAndUpdate(
+    userId,
+    {
+      name,
+      state,
+    },
+    {
+      new: true,
+      runValidators: true,
+    }
+  );
+
+  if (!user) {
+    throw new BadRequestError("Invoice profile details updation failed");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Invoice profile details updated successfully",
+  });
+};

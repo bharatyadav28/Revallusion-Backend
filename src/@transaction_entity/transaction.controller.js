@@ -364,8 +364,8 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
             resolve(data);
           } catch (error) {
             console.log(error);
-            res.status(400).send({ message: "something went wrong" });
-            // reject({error:"Something went wrong"});
+            // res.status(400).send({ message: "something went wrong" });
+            reject({ error: "Something went wrong" });
           }
         }
       });
@@ -424,6 +424,11 @@ exports.getUserTransactions = async (req, res) => {
     {
       $match: {
         user: new mongoose.Types.ObjectId(userId),
+      },
+    },
+    {
+      $sort: {
+        createdAt: -1,
       },
     },
     {

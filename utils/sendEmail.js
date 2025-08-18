@@ -2,10 +2,12 @@ const sg = require("@sendgrid/mail");
 const nodemailer = require("nodemailer");
 
 const api = process.env.SENDGRIP_API;
+console.log("api", api);
 sg.setApiKey(api);
 
 const sendEmail = async ({ to, subject, html, attachments }) => {
   const isProdEnv = process.env.NODE_ENV === "production";
+  // const isProdEnv = true;
 
   if (isProdEnv) {
     const mailOptions = {

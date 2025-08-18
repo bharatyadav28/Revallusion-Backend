@@ -28,7 +28,7 @@ const {
 const { getTokenPayload } = require("../../utils/helperFuns");
 const { createAccessToken } = require("../../utils/jwt");
 const { attachAccessTokenToCookies } = require("../../utils/jwt");
-// const { handleWhatsAppMessage } = require("../../utils/whatsapp");
+const { handleWhatsAppMessage } = require("../../utils/whatsapp");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -1195,13 +1195,46 @@ exports.sendWhatsAppMessage = async (req, res) => {
     throw new BadRequestError("Message cannot be empty");
   }
 
-  // const response = await handleWhatsAppMessage(message);
-  if (!response) {
-    throw new BadRequestError("Failed to send WhatsApp message");
-  }
+  const [usersMobile] = await userModel.aggregate([
+    {
+      $match: {
+        isDeleted: false,
+        isEmailVerified: true,
+        mobile: { $exists: true, $ne: null, $ne: "" },
+      },
+    },
+
+    {
+      $group: {
+        _id: null,
+        mobiles: { $addToSet: "$mobile" },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        mobiles: 1,
+      },
+    },
+  ]);
+
+  const mobiles = usersMobile?.mobiles || [];
+
+  console.log("Mobiles to send WhatsApp message:", mobiles);
+
+  // for (let mobile of mobiles) {
+  //   await handleWhatsAppMessage(mobile, message);
+  // }
+
+  // const number = "+918708353990";
+  const number = "+919972175257";
+
+  const response = await handleWhatsAppMessage(number, message);
+  console.log("Response from WhatsApp:", response);
+
   return res.status(StatusCodes.OK).json({
     success: true,
     message: "WhatsApp message sent successfully",
-    data: { response },
+    // data: { response },
   });
 };

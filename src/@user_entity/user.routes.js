@@ -14,6 +14,8 @@ const {
   updateName,
   deleteAccount,
   updateAddress,
+  getInvoiceProfileDetails,
+  updateInvoiceProfileDetails,
 } = require("./user.controller");
 const { upload } = require("../../utils/s3");
 
@@ -37,5 +39,10 @@ router.route("/mobile").put(auth, updateMobile);
 router.route("/address").put(auth, updateAddress);
 
 router.route("/delete-account").delete(auth, deleteAccount);
+
+router
+  .route("/invoice-profile")
+  .get(auth, getInvoiceProfileDetails)
+  .put(auth, updateInvoiceProfileDetails);
 
 module.exports = router;

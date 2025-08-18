@@ -85,6 +85,11 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
 
+    state: {
+      type: String,
+      trim: true,
+    },
+
     activeSessions: activeSessionSchema,
 
     isDeleted: {
