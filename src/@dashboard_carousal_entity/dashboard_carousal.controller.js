@@ -4,6 +4,7 @@ const DashboardCarousalModel = require("./dashboard_carousal.model");
 const { extractURLKey, awsUrl } = require("../../utils/helperFuns");
 const { BadRequestError, NotFoundError } = require("../../errors");
 const { default: mongoose } = require("mongoose");
+const AppConfigModel = require("../@app_config_entity/app_config.model");
 
 // Create carousal
 exports.createDashboardCarousal = async (req, res) => {
@@ -31,7 +32,7 @@ exports.createDashboardCarousal = async (req, res) => {
 
 // Get all carousals
 exports.getDashboardCarousals = async (req, res) => {
-  const carousals = await DashboardCarousalModel.aggregate([
+  const carousalsPromise = DashboardCarousalModel.aggregate([
     { $sort: { sequence: 1 } },
     {
       $lookup: {
@@ -113,10 +114,23 @@ exports.getDashboardCarousals = async (req, res) => {
     },
   ]);
 
+  const sideImagesPromise = AppConfigModel.findOne()
+    .select("dashboardLeftImage dashboardRightImage")
+    .lean();
+
+  const [carousals, sideImages] = await Promise.all([
+    carousalsPromise,
+    sideImagesPromise,
+  ]);
+
+  sideImages.dashboardLeftImage = awsUrl + "/" + sideImages.dashboardLeftImage;
+  sideImages.dashboardRightImage =
+    awsUrl + "/" + sideImages.dashboardRightImage;
+
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Carousals fetched successfully",
-    data: { carousals },
+    data: { carousals, sideImages },
   });
 };
 
@@ -236,5 +250,40 @@ exports.deleteDashboardCarousal = async (req, res) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Carousal removed successfully",
+  });
+};
+
+exports.updateDashboardSideImages = async (req, res) => {
+  const { leftImage, rightImage } = req.body;
+
+  if (!leftImage && !rightImage) {
+    throw new BadRequestError("Please provide at least one valid image URL");
+  }
+
+  const leftImagePath = extractURLKey(leftImage);
+  const rightImagePath = extractURLKey(rightImage);
+
+  const result = await AppConfigModel.findOneAndUpdate(
+    {},
+    {
+      $set: {
+        dashboardLeftImage: leftImagePath,
+        dashboardRightImage: rightImagePath,
+      },
+    },
+    {
+      new: true,
+      upsert: true,
+      runValidators: true,
+    }
+  );
+
+  if (!result) {
+    throw new BadRequestError("Error in updating dashboard left image");
+  }
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Dashboard side updated successfully",
   });
 };

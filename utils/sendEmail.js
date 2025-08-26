@@ -2,14 +2,14 @@ const sg = require("@sendgrid/mail");
 const nodemailer = require("nodemailer");
 
 const api = process.env.SENDGRIP_API;
-console.log("api", api);
 sg.setApiKey(api);
 
 const sendEmail = async ({ to, subject, html, attachments }) => {
-  const isProdEnv = process.env.NODE_ENV === "production";
-  // const isProdEnv = true;
+  // const isProdEnv = process.env.NODE_ENV === "production";
+  const isProdEnv = true;
+  const useSendgrid = false;
 
-  if (isProdEnv) {
+  if (isProdEnv && useSendgrid) {
     const mailOptions = {
       to,
       from: {
@@ -32,7 +32,7 @@ const sendEmail = async ({ to, subject, html, attachments }) => {
     // Send email using SendGrid
     return sg.send(mailOptions);
   } else {
-    const transporter = nodemailer.createTransport({
+    const devTransporter = nodemailer.createTransport({
       host: "smtp.ethereal.email",
       port: process.env.ETHERIAL_PORT,
       auth: {
@@ -41,12 +41,29 @@ const sendEmail = async ({ to, subject, html, attachments }) => {
       },
     });
 
-    const mailOptions = {
-      from: {
-        email: "contact@ravallusion.com",
-        name: "Ravallusion",
+    const smtpTransporter = nodemailer.createTransport({
+      host: "email-smtp.ap-south-1.amazonaws.com",
+      port: 587,
+      secure: false,
+      auth: {
+        user: process.env.SES_USER, // from SMTP creds
+        pass: process.env.SES_PASS,
       },
-      // from: '"Ravallusion" < ravallusionacademy@gmail.com>',
+    });
+
+    const elasticTransporter = nodemailer.createTransport({
+      host: "smtp.elasticemail.com",
+      port: 2525, // Elastic recommends 2525, 587, or 465 (SSL)
+      auth: {
+        user: "contact@ravallusion.com", // must be a verified email/domain in Elastic
+        pass: process.env.ELASTIC_API_KEY, // Elastic API key (SMTP access)
+      },
+    });
+
+    const transporter = isProdEnv ? elasticTransporter : devTransporter;
+
+    const mailOptions = {
+      from: "no-reply@ravallusion.com",
       to,
       subject,
       html,
