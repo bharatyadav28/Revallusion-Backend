@@ -748,7 +748,11 @@ exports.createUser = async (req, res) => {
     throw new BadRequestError("Email cannot be empty");
   }
 
-  const existingUserPromise = userModel.findOne({ email });
+  const existingUserPromise = userModel.findOne({
+    email,
+    isDeleted: false,
+    isEmailVerified: true,
+  });
   let planPromise = null;
   if (plan) {
     planPromise = await PlanModel.findById(plan);
