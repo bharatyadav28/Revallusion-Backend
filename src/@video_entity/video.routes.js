@@ -51,10 +51,10 @@ router
   .route("/permanently-delete/:id")
   .delete(auth, isAdmin, permanatelyDeleteVideo);
 
-router.route("/uploads/initiate").post(auth, isAdmin, initiateMultipartUpload);
-router.route("/uploads/generate-urls").post(auth, isAdmin, getUploadParts);
-router.route("/uploads/complete").post(auth, isAdmin, completeMultipartUpload);
-router.route("/uploads/abort").post(auth, isAdmin, abortMultipartUpload);
+router.route("/uploads/initiate").post(auth, initiateMultipartUpload);
+router.route("/uploads/generate-urls").post(auth, getUploadParts);
+router.route("/uploads/complete").post(auth, completeMultipartUpload);
+router.route("/uploads/abort").post(auth, abortMultipartUpload);
 
 router.post("/stream/start-upload", auth, isAdmin, start_upload);
 router.post("/stream/upload", auth, isAdmin, upload.single("file"), uploads);
