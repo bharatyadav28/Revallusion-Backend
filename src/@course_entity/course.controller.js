@@ -369,6 +369,7 @@ exports.getSubscribedPlanCourse = async (req, res) => {
                           thumbnailUrl: 1,
                           duration: 1,
                           sequence: 1,
+                          lock: 1,
                         },
                       },
                     ],

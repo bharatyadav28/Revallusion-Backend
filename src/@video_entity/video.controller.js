@@ -202,6 +202,7 @@ exports.getVideo = async (req, res, next) => {
       assignment: 1,
       course: 1,
       submodule: 1,
+      disableForward: 1,
     }
   )
     .populate({
@@ -278,6 +279,8 @@ exports.saveVideo = async (req, res, next) => {
     submodule,
     duration,
     assignment,
+    disableForward,
+    lock,
   } = req.body;
 
   if (!title || !description || !thumbnailUrl || !videoUrl) {
@@ -298,6 +301,8 @@ exports.saveVideo = async (req, res, next) => {
     duration,
     assignment,
     sequence: 0,
+    disableForward,
+    lock,
   };
 
   let isFreeCourse = false;
@@ -365,6 +370,8 @@ exports.updateVideo = async (req, res, next) => {
     submodule,
     resource,
     assignment,
+    disableForward,
+    lock,
   } = req.body;
 
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
@@ -382,6 +389,9 @@ exports.updateVideo = async (req, res, next) => {
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
   if (resource) video.resource = resource;
   video.assignment = assignment ? assignment : "";
+  video.disableForward =
+    typeof disableForward === "boolean" ? disableForward : false;
+  video.lock = typeof lock === "boolean" ? lock : false;
 
   if (isVideoLocationUpdated) {
     // Remove video from source course if exists
@@ -1033,5 +1043,43 @@ exports.searchVideos = async (req, res) => {
     data: {
       filteredVideos,
     },
+  });
+};
+
+exports.manageForwardVideoRestriction = async (req, res) => {
+  const id = req.params.id;
+
+  const video = await VideoModel.findById(id);
+  if (!video) {
+    throw new NotFoundError("Video not found");
+  }
+
+  video.disableForward = !video.disableForward;
+
+  await video.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Video updated successfully",
+    data: video,
+  });
+};
+
+exports.manageLockVideoRestriction = async (req, res) => {
+  const id = req.params.id;
+
+  const video = await VideoModel.findById(id);
+  if (!video) {
+    throw new NotFoundError("Video not found");
+  }
+
+  video.lock = !video.lock;
+
+  await video.save();
+
+  res.status(200).json({
+    success: true,
+    message: "Video updated successfully",
+    data: video,
   });
 };

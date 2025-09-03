@@ -21,6 +21,8 @@ const {
   start_upload,
   uploads,
   complete_upload,
+  manageForwardVideoRestriction,
+  manageLockVideoRestriction,
 } = require("./video.controller.js");
 const { upload } = require("../../utils/s3.js");
 
@@ -59,5 +61,12 @@ router.route("/uploads/abort").post(auth, isAdmin, abortMultipartUpload);
 router.post("/stream/start-upload", auth, start_upload);
 router.post("/stream/upload", auth, upload.single("file"), uploads);
 router.post("/stream/complete-upload", auth, complete_upload);
+
+router
+  .route("/forward-restrict/:id")
+  .put(auth, isAdmin, manageForwardVideoRestriction);
+router
+  .route("/lock-restrict/:id")
+  .put(auth, isAdmin, manageLockVideoRestriction);
 
 module.exports = router;

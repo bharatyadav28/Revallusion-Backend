@@ -56,6 +56,15 @@ const videoSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    disableForward: {
+      type: Boolean,
+      default: false,
+    },
+    lock: {
+      type: Boolean,
+      default: false,
+    },
     isDeleted: {
       type: Boolean,
       default: false,
