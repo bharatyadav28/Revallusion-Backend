@@ -98,6 +98,7 @@ const DashboardContentRouter = require("./src/@dashboard_content_entity /dashboa
 const CertificateRouter = require("./src/@certificate_entity/certificate.index.js");
 const AppConfigRouter = require("./src/@app_config_entity/app_config.index.js");
 const FooterRouter = require("./src/@footer_entity/footer.index.js");
+const { recommendedVideosRouter } = require("./src/@recommended_videos_entity");
 
 // Paths
 
@@ -135,6 +136,7 @@ app.use("/api/v1/dashboard/content", DashboardContentRouter);
 app.use("/api/v1/user-certificate", CertificateRouter);
 app.use("/api/v1/app-config", AppConfigRouter);
 app.use("/api/v1/footer", FooterRouter);
+app.use("/api/v1/recommended-videos", recommendedVideosRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

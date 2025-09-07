@@ -23,6 +23,7 @@ const {
   complete_upload,
   manageForwardVideoRestriction,
   manageLockVideoRestriction,
+  getRecommendedVideos,
 } = require("./video.controller.js");
 const { upload } = require("../../utils/s3.js");
 
@@ -36,6 +37,7 @@ router.route("/").get(auth, isAdmin, getVideos).post(auth, isAdmin, saveVideo);
 router.route("/delete-all-videos").delete(auth, isAdmin, deleteAllVideos);
 
 router.route("/list").post(auth, isAdmin, getVideoList);
+router.route("/recommended").post(auth, isAdmin, getRecommendedVideos);
 
 router.route("/introductory-videos").get(getIntroductoryVideos);
 

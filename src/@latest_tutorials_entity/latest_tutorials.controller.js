@@ -195,8 +195,9 @@ exports.deleteVideosFromTutorials = async (req, res) => {
       );
     });
   } catch (error) {
-    await session.endSession();
     throw error;
+  } finally {
+    await session.endSession();
   }
 
   res.status(StatusCodes.OK).json({

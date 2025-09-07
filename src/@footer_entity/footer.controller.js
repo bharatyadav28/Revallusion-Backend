@@ -9,8 +9,6 @@ const { extractURLKey, awsUrl } = require("../../utils/helperFuns.js");
 exports.createFooter = async (req, res) => {
   let { name, iconPath, url } = req.body;
 
-  console.log(req.body);
-
   if (!iconPath || !url) {
     throw new BadRequestError("Please provide  iconPath, and url");
   }

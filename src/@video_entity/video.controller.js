@@ -733,6 +733,89 @@ exports.getVideoList = async (req, res, next) => {
   });
 };
 
+exports.getRecommendedVideos = async (req, res) => {
+  const { currentCourseId } = req.body;
+  const { search, resultPerPage, currentPage } = req.query;
+
+  const { excludeVideos } = req.body;
+
+  if (!currentCourseId) {
+    throw new BadRequestError("Please provide current course id");
+  }
+
+  const currentCourse = await CourseModel.findById(currentCourseId)
+    .select("_id level")
+    .lean();
+  if (!currentCourse) {
+    throw new NotFoundError("Current course not found");
+  }
+
+  const eligibleCourses = await CourseModel.find({
+    level: { $gt: currentCourse.level },
+  }).select("_id level");
+
+  const eligibleCourseIds = [];
+  for (const course of eligibleCourses) {
+    eligibleCourseIds.push(course._id);
+  }
+
+  let query = {
+    isDeleted: false,
+    course: { $in: eligibleCourseIds },
+  };
+
+  if (excludeVideos && excludeVideos.length > 0) {
+    query._id = {
+      $nin: excludeVideos.map((id) => StringToObjectId(id)),
+    };
+  }
+
+  if (search) {
+    query.$and = [
+      {
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+        ],
+      },
+    ];
+    delete query.$or;
+  }
+
+  const limit = Number(resultPerPage) || 8;
+  const page = Number(currentPage) || 1;
+  const skip = (page - 1) * limit;
+
+  const recommendedVideos = await VideoModel.aggregate([
+    {
+      $match: {
+        ...query,
+      },
+    },
+    {
+      $skip: skip,
+    },
+    {
+      $limit: limit,
+    },
+    {
+      $project: {
+        title: 1,
+        description: 1,
+      },
+    },
+  ]);
+
+  const totalVideos = await VideoModel.countDocuments(query);
+  const pagesCount = Math.ceil(totalVideos / limit) || 1;
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Recommended videos fetched successfully",
+    data: { videos: recommendedVideos, pagesCount },
+  });
+};
+
 // Start video upload of largerize
 
 const randomBytes = promisify(crypto.randomBytes);

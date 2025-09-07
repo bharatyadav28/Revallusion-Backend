@@ -155,9 +155,20 @@ exports.getCourse = async (req, res) => {
     throw new NotFoundError("Course not found");
   }
 
+  const maxLevelCourse = await courseModel
+    .findOne()
+    .sort({ level: -1 })
+    .limit(1)
+    .select("level");
+
+  const hasSuggestionVideos =
+    course.level < maxLevelCourse.level && course.level > 0;
+
+  console.log(maxLevelCourse, course.level, hasSuggestionVideos);
+
   res.status(StatusCodes.OK).json({
     success: true,
-    data: { course: course },
+    data: { course: course, hasSuggestionVideos },
   });
 };
 
