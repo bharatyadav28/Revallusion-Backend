@@ -3,6 +3,7 @@ const { StatusCodes } = require("http-status-codes");
 
 const RecommendedVideosModel = require("./recommended_videos.model");
 const { NotFoundError } = require("../../errors");
+const { awsUrl } = require("../../utils/helperFuns");
 
 exports.getCourseRecommendations = async (req, res) => {
   const courseId = req.params.courseId;
@@ -263,5 +264,71 @@ exports.updateActiveStatus = async (req, res, next) => {
   res.status(StatusCodes.OK).json({
     success: true,
     message: "Video status updated successfully",
+  });
+};
+
+exports.getVideoRecommendations = async (req, res) => {
+  const courseId = req.params.courseId;
+
+  const videos = await RecommendedVideosModel.aggregate([
+    {
+      $match: {
+        course: new mongoose.Types.ObjectId(courseId),
+        isActive: true,
+      },
+    },
+    {
+      $sort: { sequence: 1 },
+    },
+    {
+      $lookup: {
+        from: "videos",
+        let: {
+          videoId: "$video",
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$_id", "$$videoId"],
+              },
+            },
+          },
+          {
+            $set: {
+              thumbnailUrl: {
+                $concat: [awsUrl, "/", "$thumbnailUrl"],
+              },
+            },
+          },
+          {
+            $project: {
+              title: 1,
+              description: 1,
+              thumbnailUrl: 1,
+              duration: 1,
+            },
+          },
+        ],
+        as: "Videos",
+      },
+    },
+    {
+      $set: {
+        video: { $arrayElemAt: ["$Videos", 0] },
+      },
+    },
+    {
+      $project: {
+        video: 1,
+        sequence: 1,
+      },
+    },
+  ]);
+
+  return res.status(200).json({
+    success: true,
+    message: "Recommended course videos fetched successfully",
+    data: { videos },
   });
 };

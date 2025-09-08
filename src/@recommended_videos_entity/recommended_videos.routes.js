@@ -6,6 +6,7 @@ const {
   updateRecommendedVideoSequence,
   deleteRecommendedVideo,
   updateActiveStatus,
+  getVideoRecommendations,
 } = require("./recommended_videos.controller.js");
 
 const recommendedVideosRouter = express.Router();
@@ -14,6 +15,10 @@ recommendedVideosRouter
   .route("/course/:courseId")
   .get(auth, isAdmin, getCourseRecommendations)
   .post(auth, isAdmin, addRecommendedVideos);
+
+recommendedVideosRouter
+  .route("/public/course/:courseId")
+  .get(auth, getVideoRecommendations);
 
 recommendedVideosRouter
   .route("/:id")
