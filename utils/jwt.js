@@ -91,3 +91,7 @@ exports.attachTempTokenToCookies = ({ res, tempToken }) => {
     expires: new Date(Date.now() + tempTime),
   });
 };
+
+exports.generateTokenForAI = () => {
+  return jwt.sign({ aiAccess: true }, process.env.TEMP_SECRET);
+};

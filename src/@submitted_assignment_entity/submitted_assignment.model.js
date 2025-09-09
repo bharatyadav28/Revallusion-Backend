@@ -31,6 +31,15 @@ const SubmittedAssignmentSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  isGradedByAdmin: {
+    type: Boolean,
+    default: false,
+  },
+  feedback: {
+    type: String,
+    trim: true,
+    default: null,
+  },
   isRevoked: {
     type: Boolean,
     default: false,

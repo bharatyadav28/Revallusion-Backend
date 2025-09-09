@@ -10,6 +10,7 @@ const {
   hasAlreadySubmittedAssignment,
   subscribedCourseAssignments,
   getUserAssignments,
+  updateScoreByAI,
 } = require("./submitted_assignment.controller");
 const { upload } = require("../../utils/s3");
 
@@ -24,6 +25,7 @@ router
   .route("/upload-answer")
   .post(auth, upload.single("file"), uploadAssignmentAnswer);
 router.route("/:id").put(auth, isAdmin, updateScore);
+router.route("/ai/:id").put(auth, isAdmin, updateScoreByAI);
 router.route("/:id/revoke").put(auth, isAdmin, revokeAssignment);
 
 router

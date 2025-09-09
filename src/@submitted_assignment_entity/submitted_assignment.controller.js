@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const path = require("path");
 const { StatusCodes } = require("http-status-codes");
+const jwt = require("jsonwebtoken");
 
 const { NotFoundError, BadRequestError } = require("../../errors");
 const SubmittedAssignmentModel = require("./submitted_assignment.model");
@@ -22,6 +23,7 @@ const {
 } = require("../@certificate_entity/certificate.controller");
 const SubmoduleModel = require("../@submodule_entity/submodule.model");
 const userModel = require("../@user_entity/user.model");
+const { generateTokenForAI } = require("../../utils/jwt");
 
 exports.uploadAssignmentAnswer = async (req, res) => {
   // Upload image or document file only
@@ -106,11 +108,49 @@ exports.hasAlreadySubmittedAssignment = async (req, res) => {
 // Update assignment score
 exports.updateScore = async (req, res) => {
   const { id } = req.params;
-  const { score } = req.body;
+  const { score, feedback } = req.body;
 
   const assignment = await SubmittedAssignmentModel.findOneAndUpdate(
     { _id: id, isRevoked: false },
-    { score, gradedAt: Date.now() }
+    { score, gradedAt: Date.now(), feedback, isGradedByAdmin: true },
+    { new: true, runValidators: true }
+  );
+  if (!assignment) {
+    throw new NotFoundError("Assignment not found");
+  }
+
+  // On course and assigments completion
+  await saveUserProgress(assignment.user);
+
+  return res.status(StatusCodes.OK).json({
+    success: true,
+    message: "Assignment updated successfully",
+  });
+};
+
+// Update assignment score
+exports.updateScoreByAI = async (req, res) => {
+  const { id } = req.params;
+  const { score, feedback, authToken } = req.body;
+
+  if (!authToken) {
+    throw new BadRequestError("Auth token is required");
+  }
+
+  try {
+    await jwt.verify(authToken, process.env.TEMP_SECRET);
+  } catch (error) {
+    throw new BadRequestError("Invalid auth token");
+  }
+
+  if (!score) {
+    throw new BadRequestError("Score is required");
+  }
+
+  const assignment = await SubmittedAssignmentModel.findOneAndUpdate(
+    { _id: id, isRevoked: false },
+    { score, gradedAt: Date.now(), feedback, isGradedByAdmin: false },
+    { new: true, runValidators: true }
   );
   if (!assignment) {
     throw new NotFoundError("Assignment not found");
