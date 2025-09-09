@@ -164,8 +164,6 @@ exports.getCourse = async (req, res) => {
   const hasSuggestionVideos =
     course.level < maxLevelCourse.level && course.level > 0;
 
-  console.log(maxLevelCourse, course.level, hasSuggestionVideos);
-
   res.status(StatusCodes.OK).json({
     success: true,
     data: { course: course, hasSuggestionVideos },

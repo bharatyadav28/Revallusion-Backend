@@ -99,6 +99,9 @@ const CertificateRouter = require("./src/@certificate_entity/certificate.index.j
 const AppConfigRouter = require("./src/@app_config_entity/app_config.index.js");
 const FooterRouter = require("./src/@footer_entity/footer.index.js");
 const { recommendedVideosRouter } = require("./src/@recommended_videos_entity");
+const {
+  AssignmentResourcesRouter,
+} = require("./src/@assignment_resources_entity");
 
 // Paths
 
@@ -137,6 +140,7 @@ app.use("/api/v1/user-certificate", CertificateRouter);
 app.use("/api/v1/app-config", AppConfigRouter);
 app.use("/api/v1/footer", FooterRouter);
 app.use("/api/v1/recommended-videos", recommendedVideosRouter);
+app.use("/api/v1/assignment-resources", AssignmentResourcesRouter);
 
 // Notfound and error middlewares
 app.use(pageNotFound);

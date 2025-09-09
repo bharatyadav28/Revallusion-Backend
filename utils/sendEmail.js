@@ -35,7 +35,7 @@ const elasticTransporter = nodemailer.createTransport({
   port: 2525,
   auth: {
     user: "contact@ravallusion.com",
-    pass: process.env.ELASTIC_API_KEY,
+    pass: process.env?.ELASTIC_API_KEY || "",
   },
 });
 

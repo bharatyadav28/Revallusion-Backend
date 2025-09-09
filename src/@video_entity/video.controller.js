@@ -278,7 +278,7 @@ exports.saveVideo = async (req, res, next) => {
     module,
     submodule,
     duration,
-    assignment,
+    // assignment,
     disableForward,
     lock,
   } = req.body;
@@ -288,7 +288,7 @@ exports.saveVideo = async (req, res, next) => {
   }
 
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
-  if (assignment) assignment = extractURLKey(assignment);
+  // if (assignment) assignment = extractURLKey(assignment);
 
   const videoData = {
     title,
@@ -299,7 +299,7 @@ exports.saveVideo = async (req, res, next) => {
     module: course && module ? module : null,
     submodule: course && module ? submodule : null,
     duration,
-    assignment,
+    // assignment,
     sequence: 0,
     disableForward,
     lock,
@@ -369,14 +369,14 @@ exports.updateVideo = async (req, res, next) => {
     module,
     submodule,
     resource,
-    assignment,
+    // assignment,
     disableForward,
     lock,
   } = req.body;
 
   if (thumbnailUrl) thumbnailUrl = extractURLKey(thumbnailUrl);
   if (resource) resource = extractURLKey(resource);
-  if (assignment) assignment = extractURLKey(assignment);
+  // if (assignment) assignment = extractURLKey(assignment);
 
   // Video course, module or submodule is updated (paid)
   const isVideoLocationUpdated =
@@ -388,7 +388,7 @@ exports.updateVideo = async (req, res, next) => {
   if (description) video.description = description;
   if (thumbnailUrl) video.thumbnailUrl = thumbnailUrl;
   if (resource) video.resource = resource;
-  video.assignment = assignment ? assignment : "";
+  // video.assignment = assignment ? assignment : "";
   video.disableForward =
     typeof disableForward === "boolean" ? disableForward : false;
   video.lock = typeof lock === "boolean" ? lock : false;
