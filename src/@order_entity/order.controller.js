@@ -133,7 +133,9 @@ const activateSubscription = async ({
     status: "Pending",
   });
 
-  const userPromise = UserModel.findById(userId).select("name email mobile");
+  const userPromise = UserModel.findById(userId).select(
+    "name email mobile state"
+  );
   const countTransactionsPromise = TransactionModel.countDocuments();
 
   const [transaction, user, countTransactions] = await Promise.all([
