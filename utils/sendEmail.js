@@ -51,7 +51,7 @@ const elasticEmailMail = async ({ to, subject, html, attachments }) => {
           }),
         ],
         Subject: subject,
-        From: "contact@ravallusion.com",
+        From: "Ravallusion <contact@ravallusion.com>",
       },
     });
 
@@ -104,7 +104,10 @@ const sendgridMail = async ({ to, subject, html, attachments }) => {
 
 const useTransporter = ({ to, subject, html, attachments, transporter }) => {
   const mailOptions = {
-    from: "contact@ravallusion.com",
+    from: {
+      email: "contact@ravallusion.com",
+      name: "Ravallusion",
+    },
     to,
     subject,
     html,
