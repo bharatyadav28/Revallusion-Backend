@@ -25,12 +25,16 @@ const recommendedVideosSchema = new mongoose.Schema(
 );
 
 recommendedVideosSchema.statics.getNextSequence = async function (courseId) {
-  const maxSequence = await this.findOne(
+  const maxSequenceDoc = await this.findOne(
     { course: new mongoose.Types.ObjectId(courseId) },
     { sequence: 1 },
     { sort: { sequence: -1 } }
   );
-  return (maxSequence?.sequence || 0) + 1;
+  const maxSequence = maxSequenceDoc?.sequence || 0;
+
+  const nextSequence = (maxSequence < 0 ? 0 : maxSequence) + 1;
+
+  return nextSequence;
 };
 
 module.exports = mongoose.model("RecommendedVideos", recommendedVideosSchema);
