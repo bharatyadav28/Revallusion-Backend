@@ -25,7 +25,7 @@ router
   .route("/upload-answer")
   .post(auth, upload.single("file"), uploadAssignmentAnswer);
 router.route("/:id").put(auth, isAdmin, updateScore);
-router.route("/ai/:id").put(auth, isAdmin, updateScoreByAI);
+router.route("/ai/:id").put(updateScoreByAI);
 router.route("/:id/revoke").put(auth, isAdmin, revokeAssignment);
 
 router
