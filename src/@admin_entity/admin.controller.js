@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const StatusCodes = require("http-status-codes");
+const XLSX = require("xlsx");
 
 const userModel = require("../@user_entity/user.model");
 const OrderModel = require("../@order_entity/order.model");
@@ -29,6 +30,7 @@ const { getTokenPayload } = require("../../utils/helperFuns");
 const { createAccessToken } = require("../../utils/jwt");
 const { attachAccessTokenToCookies } = require("../../utils/jwt");
 const { handleWhatsAppMessage } = require("../../utils/whatsapp");
+const sendEmail = require("../../utils/sendEmail");
 
 // Admin signin
 exports.adminSignin = async (req, res) => {
@@ -296,6 +298,9 @@ exports.getUsers = async (req, res) => {
               },
             },
             {
+              $match: query,
+            },
+            {
               $lookup: {
                 from: "certificates",
 
@@ -510,6 +515,28 @@ exports.getUsers = async (req, res) => {
           status: "Active",
           // expiry_date: { $gte: new Date() },
         },
+      },
+      {
+        $lookup: {
+          from: "users",
+          let: {
+            userId: "$user",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $eq: ["$_id", "$$userId"] },
+              },
+            },
+            {
+              $match: query,
+            },
+          ],
+          as: "user",
+        },
+      },
+      {
+        $unwind: "$user",
       },
       {
         $count: "usersCount",
@@ -1241,4 +1268,292 @@ exports.sendWhatsAppMessage = async (req, res) => {
     message: "WhatsApp message sent successfully",
     // data: { response },
   });
+};
+
+exports.getUsersCSV = async (req, res) => {
+  let { search, selectedPlan, isDeleted } = req.query;
+
+  // Query for aggregation
+  let query = {
+    isDeleted: isDeleted === "yes" ? true : false,
+    role: "user",
+    isEmailVerified: true,
+    mobile: { $ne: null, $ne: "", $exists: true },
+  };
+  search = search?.trim();
+  if (search) {
+    const searchRegExp = new RegExp(search, "i");
+    query.$or = [
+      { name: { $regex: searchRegExp } },
+      { email: { $regex: searchRegExp } },
+      { mobile: { $regex: searchRegExp, $ne: null, $ne: "" } },
+    ];
+  }
+
+  let query2 = {};
+  if (selectedPlan === "noPlan") {
+    query2 = { order: { $eq: [] } };
+  }
+
+  if (selectedPlan == "clear") {
+    selectedPlan = null;
+  }
+
+  let users = [];
+  if (selectedPlan && selectedPlan !== "noPlan") {
+    users = await OrderModel.aggregate([
+      {
+        $match: {
+          plan: new mongoose.Types.ObjectId(selectedPlan),
+          status: "Active",
+          expiry_date: { $gte: new Date() },
+        },
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "users",
+          localField: "user",
+          foreignField: "_id",
+          as: "user",
+        },
+      },
+      {
+        $unwind: "$user",
+      },
+      {
+        $match: {
+          "user.isDeleted": query.isDeleted,
+          "user.role": query.role,
+          "user.isEmailVerified": query.isEmailVerified,
+          "user.mobile": query.mobile,
+          ...(query.$or && {
+            $or: query.$or.map((condition) => {
+              const key = Object.keys(condition)[0];
+              return { [`user.${key}`]: condition[key] };
+            }),
+          }),
+        },
+      },
+      {
+        $group: {
+          _id: "$user.mobile",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$doc" },
+      },
+      {
+        $project: {
+          _id: "$user._id",
+          name: { $ifNull: ["$user.name", null] },
+          email: "$user.email",
+          mobile: { $ifNull: ["$user.mobile", null] },
+        },
+      },
+    ]);
+  } else if (selectedPlan === "noPlan") {
+    users = await userModel.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "orders",
+          let: {
+            userId: "$_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$user", "$$userId"] },
+                    { $eq: ["$status", "Active"] },
+                    { $gte: ["$expiry_date", new Date()] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                plan: 1,
+              },
+            },
+          ],
+          as: "order",
+        },
+      },
+      {
+        $match: query2,
+      },
+
+      {
+        $set: {
+          plan: { $arrayElemAt: ["$order.plan", 0] },
+        },
+      },
+
+      {
+        $group: {
+          _id: "$mobile",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$doc" },
+      },
+      {
+        $project: {
+          name: { $ifNull: ["$name", null] },
+          email: 1,
+          mobile: { $ifNull: ["$mobile", null] },
+        },
+      },
+    ]);
+  } else {
+    users = await userModel.aggregate([
+      {
+        $match: query,
+      },
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
+
+      {
+        $lookup: {
+          from: "orders",
+          let: {
+            userId: "$_id",
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$user", "$$userId"] },
+                    { $eq: ["$status", "Active"] },
+                    { $gte: ["$expiry_date", new Date()] },
+                  ],
+                },
+              },
+            },
+            {
+              $project: {
+                plan: 1,
+              },
+            },
+          ],
+          as: "order",
+        },
+      },
+      {
+        $match: query2,
+      },
+
+      {
+        $set: {
+          plan: { $arrayElemAt: ["$order.plan", 0] },
+        },
+      },
+
+      {
+        $group: {
+          _id: "$mobile",
+          doc: { $first: "$$ROOT" },
+        },
+      },
+      {
+        $replaceRoot: { newRoot: "$doc" },
+      },
+      {
+        $project: {
+          name: { $ifNull: ["$name", null] },
+          email: 1,
+          mobile: { $ifNull: ["$mobile", null] },
+        },
+      },
+    ]);
+  }
+
+  const data = users.map((user) => {
+    let countryCode = "91";
+    let phoneNumber = "";
+
+    if (user.mobile) {
+      let mobile = user.mobile;
+
+      // Check if mobile starts with +
+      if (mobile.startsWith("+")) {
+        mobile = mobile.substring(1); // Remove the + sign
+      }
+
+      // Extract country code and phone number
+      if (mobile.length > 10) {
+        countryCode = mobile.slice(0, -10);
+        phoneNumber = mobile.slice(-10);
+      } else {
+        phoneNumber = mobile;
+      }
+    }
+
+    return {
+      Name: user.name || "user",
+      CountryCode: countryCode,
+      Phone: phoneNumber,
+      Email: user.email,
+    };
+  });
+
+  // Convert data to worksheet
+  const worksheet = XLSX.utils.json_to_sheet(data);
+
+  // Create workbook and add the worksheet
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Sheet1");
+
+  // Write the workbook to a buffer
+  const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+
+  // Set response headers
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  );
+  res.setHeader("Content-Disposition", "attachment; filename=users.xlsx");
+
+  // await sendEmail({
+  //   to: "a@gmail.com",
+  //   subject: "Users Report",
+  //   text: "Please find the attached users report.",
+  //   attachments: [
+  //     {
+  //       filename: "users.xlsx",
+  //       content: buffer,
+  //     },
+  //   ],
+  // });
+  res.status(200).send(buffer);
+
+  // return res.status(StatusCodes.OK).json({
+  //   success: true,
+  //   message: "User details fetched successfully",
+  //   data: {
+  //     users,
+  //   },
+  // });
 };

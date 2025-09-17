@@ -17,6 +17,7 @@ const {
   getDashBoardContent,
   restoreUser,
   sendWhatsAppMessage,
+  getUsersCSV,
 } = require("./admin.controller");
 const { upload } = require("../../utils/s3");
 
@@ -43,6 +44,8 @@ router
   .route("/users")
   .get(auth, isAdmin, getUsers)
   .post(auth, isAdmin, createUser);
+
+router.route("/users/csv/download").get(auth, isAdmin, getUsersCSV);
 router
   .route("/users/:id")
   .get(auth, isAdmin, userDetails)
