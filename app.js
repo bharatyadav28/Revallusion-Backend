@@ -142,6 +142,10 @@ app.use("/api/v1/footer", FooterRouter);
 app.use("/api/v1/recommended-videos", recommendedVideosRouter);
 app.use("/api/v1/assignment-resources", AssignmentResourcesRouter);
 
+// Testing
+// const { sendEmailTest } = require("./utils/emailHTML");
+// app.get("/api/v1/test-email", sendEmailTest);
+
 // Notfound and error middlewares
 app.use(pageNotFound);
 app.use(errorMiddleware);

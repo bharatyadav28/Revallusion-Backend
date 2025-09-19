@@ -21,6 +21,8 @@ const {
   sendInvoice,
 } = require("../@transaction_entity/transaction.controller");
 const { s3Uploadv4 } = require("../../utils/s3");
+const sendEmail = require("../../utils/sendEmail");
+const { paymentSuccessTemplate } = require("../../utils/emailHTML");
 // const { cashfree } = require("../../app");
 
 // Helper functions
@@ -187,6 +189,29 @@ const activateSubscription = async ({
     const result = await s3Uploadv4(data, "invoices", "invoice");
     transaction.invoice_url = result?.Key;
     await transaction.save();
+
+    try {
+      const attachments = [
+        {
+          filename: `${"Ravallusion"}.pdf`,
+          content: data.toString("base64"),
+          encoding: "base64",
+        },
+      ];
+
+      await sendEmail({
+        to: user.email,
+        subject: "Invoice",
+        html: paymentSuccessTemplate({
+          invoiceLink: `${awsUrl}/${result?.Key}`,
+        }),
+        attachments,
+      });
+      // console.log(data);
+    } catch (error) {
+      console.log(error);
+      // res.status(400).send({ message: "something went wrong" });
+    }
 
     // Commit the transaction
     // await session.commitTransaction();

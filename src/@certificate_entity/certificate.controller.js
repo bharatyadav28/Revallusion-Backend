@@ -17,8 +17,12 @@ const userModel = require("../@user_entity/user.model.js");
 const {
   formatDateTime,
   appendBucketName,
-  certificateAvailableEmail,
+  awsUrl,
 } = require("../../utils/helperFuns.js");
+const {
+  certificateAvailableTemplate,
+  courseCompletionTemplate,
+} = require("../../utils/emailHTML.js");
 
 // Test
 exports.createCertfifcateTest = async (req, res) => {
@@ -381,10 +385,18 @@ exports.saveUserProgress = async (userId) => {
             });
           }
 
-          await certificateAvailableEmail({
-            name: user?.name || userId,
-            email: user.email,
-          });
+          try {
+            await sendEmail({
+              to: user.email,
+              subject: "Course completed",
+              html: courseCompletionTemplate({
+                name: user?.name || userId,
+                course: activePlan?.level === 2 ? "Editorial" : "VFX",
+              }),
+            });
+          } catch (err) {
+            console.log("Error sending email", err);
+          }
         }
       } else {
         break;
@@ -461,32 +473,6 @@ const createCertificateBuffer = async ({
           console.log("Error", data, err);
         } else {
           try {
-            const attachments = [
-              {
-                filename: `certificate.pdf`,
-                path: tempFilePath,
-                content: data.toString("base64"),
-                encoding: "base64",
-              },
-            ];
-
-            const html = `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="color: #091528;">🎓 Congratulations, ${name}!</h2>
-      <p style="font-size: 16px; color: #333;">
-        You have successfully completed your course. Please find your certificate attached as a PDF.
-      </p>
-       <div style="color: #888888">
-        <p style="margin-bottom: 10px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
-      </div>
-    </div>`;
-
-            await sendEmail({
-              to: user.email,
-              subject: "Certificate",
-              html: html,
-              attachments,
-            });
-
             fs.unlink(tempFilePath, (err) => {});
             resolve(data);
           } catch (error) {
@@ -578,6 +564,29 @@ const createCertificate = async ({ name, planId, userId, isAdmin }) => {
 
   const result = await s3Uploadv4(data, "certificates", "invoice");
   const certificatePath = result?.Key;
+
+  try {
+    const attachments = [
+      {
+        filename: `certificate.pdf`,
+        content: data.toString("base64"),
+        encoding: "base64",
+      },
+    ];
+
+    await sendEmail({
+      to: user.email,
+      subject: "Certificate",
+      html: certificateAvailableTemplate({
+        name: user?.name || "User",
+        course: existingPlan?.level === 2 ? "Editorial" : "VFX",
+        certificateLink: `${awsUrl}/${certificatePath}`,
+      }),
+      attachments,
+    });
+  } catch (err) {
+    console.log("Error sending email", err);
+  }
 
   let deletePreviousPromise = null;
   if (alreadyExists) {

@@ -15,6 +15,7 @@ const sendEmail = require("../../utils/sendEmail");
 const { default: mongoose } = require("mongoose");
 const { StatusCodes } = require("http-status-codes");
 const { BadRequestError } = require("../../errors");
+const { paymentSuccessTemplate } = require("../../utils/emailHTML");
 
 exports.getAllTransactions = async (req, res) => {
   let { search, from, to, currentPage, sortByAmount, sortByDate, status } =
@@ -326,40 +327,7 @@ exports.sendInvoice = async ({ user, transaction, invoice_no, plan_type }) => {
         if (err) {
           console.log("Error", data, err);
         } else {
-          const html = `<div style="font-family: 'Arial', sans-serif; text-align: center; background-color: #f4f4f4; margin: 0; padding: 15px 0;">
-            <div style="max-width: 600px; margin: 30px auto; background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); text-align: center;">
-              <h1 style="color: #333333; font-size: 24px; margin: 20px 0;">Hey ${
-                user.name || "user"
-              }! Your Payment of ₹ ${
-            transaction.amount
-          } has been done successfully</h1>
-              <p style="color: #666666; font-size: 16px; margin: 10px 0;">You have now access to our paid content.</p> 
-              <p style="color: #666666; font-size: 14px; margin: 10px 0;">
-                If you did not request this mail, please ignore this email.
-              </p>
-            </div>
-            <div style="color: #888888; margin-top: 20px;">
-              <p style="margin: 0;">Regards, <span style="color: #caa257;">Team Ravallusion</span></p>
-            </div>
-          </div>
-`;
-
           try {
-            const attachments = [
-              {
-                filename: `${"Ravallusion"}.pdf`,
-                path: tempFilePath,
-                content: data.toString("base64"),
-                encoding: "base64",
-              },
-            ];
-
-            await sendEmail({
-              to: user.email,
-              subject: "Invoice",
-              html,
-              attachments,
-            });
             // console.log(data);
             fs.unlink(tempFilePath, (err) => {});
             resolve(data);

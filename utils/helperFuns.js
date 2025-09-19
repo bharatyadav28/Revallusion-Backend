@@ -4,7 +4,6 @@ const { v4: uuidv4 } = require("uuid");
 const userModel = require("../src/@user_entity/user.model");
 const { NotFoundError } = require("../errors/index");
 const mongoose = require("mongoose");
-const sendEmail = require("./sendEmail");
 
 // Get device info
 exports.getDeviceData = (req) => {
@@ -258,37 +257,4 @@ exports.formatDateTime = (dateTimeString, year_only) => {
 exports.generateUniqueId = () => {
   const uuid = uuidv4();
   return uuid;
-};
-
-exports.certificateAvailableEmail = async ({ name, email }) => {
-  const html = `
-    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 8px;">
-      <h2 style="color: #091528;">🎓 Congratulations, ${name}!</h2>
-      <p style="font-size: 16px; color: #333;">
-        You have successfully completed your course. Your certificate is now available.
-      </p>
-      <p style="font-size: 16px; color: #333;">
-        Please log in to your dashboard to download your certificate.
-      </p>
-      <p style="margin: 20px 0;">
-        <a href="https://www.ravallusion.com/dashboard" target="_blank" style="
-          background-color: #b19cd9;
-          color: white;
-          padding: 10px 20px;
-          text-decoration: none;
-          border-radius: 5px;
-          font-weight: bold;
-        ">Go to Dashboard</a>
-      </p>
-     <div style="color: #888888">
-        <p style="margin-bottom: 10px;">Regards, <span style="color:#b19cd9;">Team Ravallusion</span></p>
-      </div>
-    </div>
-  `;
-
-  await sendEmail({
-    to: email,
-    subject: "Course completed",
-    html,
-  });
 };

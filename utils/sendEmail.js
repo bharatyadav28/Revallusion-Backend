@@ -121,19 +121,23 @@ const useTransporter = ({ to, subject, html, attachments, transporter }) => {
 };
 
 const sendEmail = async ({ to, subject, html, attachments }) => {
-  const isProdEnv = process.env.NODE_ENV === "production";
-  // const isProdEnv = true;
+  try {
+    // let isProdEnv = process.env.NODE_ENV === "production";
+    isProdEnv = true;
 
-  if (isProdEnv) {
-    return elasticEmailMail({ to, subject, html, attachments });
-  } else {
-    return useTransporter({
-      to,
-      subject,
-      html,
-      attachments,
-      transporter: devTransporter,
-    });
+    if (isProdEnv) {
+      return elasticEmailMail({ to, subject, html, attachments });
+    } else {
+      return useTransporter({
+        to,
+        subject,
+        html,
+        attachments,
+        transporter: devTransporter,
+      });
+    }
+  } catch (err) {
+    console.log("Email not sent", err);
   }
 };
 
