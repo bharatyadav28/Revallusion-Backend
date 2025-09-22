@@ -142,7 +142,7 @@ app.use("/api/v1/footer", FooterRouter);
 app.use("/api/v1/recommended-videos", recommendedVideosRouter);
 app.use("/api/v1/assignment-resources", AssignmentResourcesRouter);
 
-// Testing
+// Testing;
 // const { sendEmailTest } = require("./utils/emailHTML");
 // app.get("/api/v1/test-email", sendEmailTest);
 

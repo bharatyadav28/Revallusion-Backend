@@ -285,14 +285,16 @@ function baseTemplate(body) {
           <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.5rem; line-height: 1.4;">
             © 2025 Ravallusion Training Academy LLP. All rights reserved
           </div>
-          <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem;">
-            123 Business District, Mumbai, Maharashtra 400001, India
-          </div>
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.5rem; line-height: 1.4;">
+  85-40-4/4, S1, Sri Shaswatha Nivas, JN Road<br>
+  Rajahmundry, East Godavari, Andhra Pradesh<br>
+  India, 533101
+</div>
           <div style="font-size: 0.7rem; color: #94a3b8;">
             <a href="mailto:unsubscribe@ravallusion.com" style="color: #94a3b8; text-decoration: underline;">
               Unsubscribe
             </a> | 
-            <a href="https://www.ravallusion.com/privacy" style="color: #94a3b8; text-decoration: underline;">
+            <a href="https://www.ravallusion.com/privacy-policy" style="color: #94a3b8; text-decoration: underline;">
               Privacy Policy
             </a>
           </div>
@@ -602,29 +604,30 @@ function certificateAvailableTemplate({ name, course, certificateLink }) {
 const sendEmailTest = async (req, res) => {
   try {
     await sendEmail({
-      to: "vinekmaurya2329@gmail.com",
-      subject: "Payment Successful",
-      // html: paymentSuccessTemplate({
-      //   invoiceLink:
-      //     "https://d2b1ol8c9bt133.cloudfront.net/invoices/58dd22bf-6ac0-4a24-aca9-3d2527cb338e.pdf",
-      // }),
-
-      html: courseCompletionTemplate({
-        name: "Bharat",
-        course: "VFX Course",
-        certificateLink:
-          "https://d2b1ol8c9bt133.cloudfront.net/certificates/58dd22bf-6ac0-4a24-aca9-3d2527cb338e.pdf",
+      to: "bharatyquantumitinnovation@gmail.com",
+      subject: "Ravallusion Academy - Payment Confirmation & Invoice",
+      html: paymentSuccessTemplate({
+        invoiceLink:
+          "https://d2b1ol8c9bt133.cloudfront.net/invoices/58dd22bf-6ac0-4a24-aca9-3d2527cb338e.pdf",
       }),
+
+      // html: courseCompletionTemplate({
+      //   name: "Bharat",
+      //   course: "VFX Course",
+
+      // }),
 
       // html: certificateAvailableTemplate({
       //   name: "Bharat",
       //   course: "VFX Course",
+      //   certificateLink:
+      //     "https://d2b1ol8c9bt133.cloudfront.net/certificates/58dd22bf-6ac0-4a24-aca9-3d2527cb338e.pdf",
       // }),
 
-      html: otpTemplate({
-        name: "Bharat",
-        otp: "123456",
-      }),
+      // html: otpTemplate({
+      //   name: "Bharat",
+      //   otp: "123456",
+      // }),
     });
     return res.status(200).send("Email sent successfully");
   } catch (err) {

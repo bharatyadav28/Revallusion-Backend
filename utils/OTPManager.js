@@ -43,9 +43,9 @@ class OTPManager {
         to: email,
         subject:
           type === "account_verification"
-            ? "Account Verification"
+            ? "Ravallusion Academy - Verify Your Account"
             : type === "two_step_auth"
-            ? "Two Step Authentication"
+            ? "Ravallusion Academy - Security Code"
             : "Password Reset",
         html: otpTemplate({ name, otp }),
       });
